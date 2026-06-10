@@ -1,25 +1,31 @@
 import type { MergedMatch, Picks } from './types';
-import { resolveBracket } from './bracket';
+import { resolveBracket, resolvePickedBracket } from './bracket';
+import { groupComplete, groupTables } from './standings';
 
 /**
- * Leaderboard scoring — 200 points max, "round-reach" membership for the
+ * Leaderboard scoring — 192 points max, "round-reach" membership for the
  * knockout phase (slot-independent, so FIFA's third-place slot-assignment
  * annex can't cause unfair mismatches between predicted and actual brackets):
  *
- *   correct group match result (W/D/W) ... 1 pt x 72
- *   team reaching the Round of 16 ........ 2 pt x 16
- *   team reaching the Quarter-finals ..... 4 pt x 8
- *   team reaching the Semi-finals ........ 6 pt x 4
- *   team reaching the Final .............. 10 pt x 2
- *   champion ............................. 20 pt
+ *   team in its exact group finishing position .. 1 pt x 48
+ *   correct third-place qualifier ............... 2 pt x 8
+ *   team reaching the Round of 16 ............... 2 pt x 16
+ *   team reaching the Quarter-finals ............ 4 pt x 8
+ *   team reaching the Semi-finals ............... 6 pt x 4
+ *   team reaching the Final ..................... 10 pt x 2
+ *   champion .................................... 20 pt
  */
-export const POINTS = { group: 1, r16: 2, qf: 4, sf: 6, final: 10, champion: 20 } as const;
+export const POINTS = { position: 1, third: 2, r16: 2, qf: 4, sf: 6, final: 10, champion: 20 } as const;
 
 export interface ScoreBreakdown {
   total: number;
-  group: number;
-  groupCorrect: number;
-  groupDecided: number;
+  /** group position points */
+  position: number;
+  positionCorrect: number;
+  /** positions scored so far = 4 x completed groups */
+  positionDecided: number;
+  /** correctly predicted third-place qualifiers */
+  thirds: string[];
   r16: string[];
   qf: string[];
   sf: string[];
@@ -53,20 +59,26 @@ function predictedWinners(
 }
 
 export function computeScore(picks: Picks, matches: MergedMatch[]): ScoreBreakdown {
-  // group stage: compare picked result to actual result
-  let groupCorrect = 0;
-  let groupDecided = 0;
-  for (const m of matches) {
-    if (m.stage !== 'group' || !m.outcome) continue;
-    groupDecided++;
-    if (picks.group[String(m.num)] === m.outcome) groupCorrect++;
+  // group stage: exact finishing position, scored once a group completes
+  const tables = groupTables(matches);
+  let positionCorrect = 0;
+  let positionDecided = 0;
+  for (const [g, rows] of Object.entries(tables)) {
+    if (!groupComplete(matches, g)) continue;
+    positionDecided += rows.length;
+    const order = picks.groupOrder[g] || [];
+    rows.forEach((r, i) => {
+      if (order[i] === r.team) positionCorrect++;
+    });
   }
 
+  // third-place qualifiers: scored once all groups are decided
+  const actual = resolveBracket(matches);
+  const actualThirds = new Set(actual.thirdQualifiers);
+  const thirds = picks.thirds.filter((t) => actualThirds.has(t)).sort();
+
   // knockout: set-membership per round reached
-  const predicted = resolveBracket(matches, {
-    pickOutcome: (num) => picks.group[String(num)],
-    pickWinner: (num) => picks.knockout[String(num)]
-  });
+  const predicted = resolvePickedBracket(matches, picks);
   const pp = predicted.participants;
 
   // matches 73-88 = R32 (winners reach R16), 89-96 = R16, 97-100 = QF,
@@ -80,22 +92,23 @@ export function computeScore(picks: Picks, matches: MergedMatch[]): ScoreBreakdo
 
   const breakdown: ScoreBreakdown = {
     total: 0,
-    group: groupCorrect * POINTS.group,
-    groupCorrect,
-    groupDecided,
+    position: positionCorrect * POINTS.position,
+    positionCorrect,
+    positionDecided,
+    thirds,
     r16: [],
     qf: [],
     sf: [],
     final: [],
     champion: null
   };
-  breakdown.total = breakdown.group;
+  breakdown.total = breakdown.position + thirds.length * POINTS.third;
 
   for (const r of rounds) {
-    const actual = actualWinners(matches, r.lo, r.hi);
+    const won = actualWinners(matches, r.lo, r.hi);
     const mine = predictedWinners(pp, picks, r.lo, r.hi);
     for (const team of mine) {
-      if (actual.has(team)) {
+      if (won.has(team)) {
         breakdown[r.key].push(team);
         breakdown.total += r.pts;
       }

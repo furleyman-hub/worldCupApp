@@ -36,11 +36,17 @@ export interface MergedMatch extends ScheduleMatch {
 }
 
 export interface Picks {
-  /** match num (1..72) -> predicted result */
-  group: Record<string, Outcome>;
+  /** group letter -> the group's 4 teams in predicted finishing order */
+  groupOrder: Record<string, string[]>;
+  /** the 8 third-place teams predicted to advance to the Round of 32 */
+  thirds: string[];
   /** match num (73..102, 104) -> predicted winner team name */
   knockout: Record<string, string>;
   updatedAt?: number;
+}
+
+export function emptyPicks(): Picks {
+  return { groupOrder: {}, thirds: [], knockout: {} };
 }
 
 export interface UserInfo {

@@ -24,7 +24,7 @@ import {
   type Firestore
 } from 'firebase/firestore';
 import { firebaseConfig, FAMILY_PASSPHRASE } from '../firebaseConfig';
-import type { Picks, UserInfo } from './types';
+import { emptyPicks, type Picks, type UserInfo } from './types';
 
 export const cloudEnabled = !!firebaseConfig.apiKey;
 
@@ -72,17 +72,25 @@ export async function signOut() {
 
 const LOCAL_PICKS_KEY = 'wc26:picks';
 
+/** Coerce any stored value (including the old per-match shape) to Picks. */
+function asPicks(v: unknown): Picks {
+  const p = v as Partial<Picks> | null;
+  if (!p || typeof p !== 'object') return emptyPicks();
+  return {
+    groupOrder: p.groupOrder && typeof p.groupOrder === 'object' ? p.groupOrder : {},
+    thirds: Array.isArray(p.thirds) ? p.thirds : [],
+    knockout: p.knockout && typeof p.knockout === 'object' ? p.knockout : {}
+  };
+}
+
 export function loadLocalPicks(): Picks {
   try {
     const raw = localStorage.getItem(LOCAL_PICKS_KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p && p.group && p.knockout) return p;
-    }
+    if (raw) return asPicks(JSON.parse(raw));
   } catch {
     /* fall through */
   }
-  return { group: {}, knockout: {} };
+  return emptyPicks();
 }
 
 export function saveLocalPicks(picks: Picks) {
@@ -96,7 +104,8 @@ export function saveLocalPicks(picks: Picks) {
 export async function savePicksCloud(uid: string, picks: Picks) {
   ensureInit();
   await setDoc(doc(db!, 'picks', uid), {
-    group: picks.group,
+    groupOrder: picks.groupOrder,
+    thirds: picks.thirds,
     knockout: picks.knockout,
     updatedAt: serverTimestamp()
   });
@@ -106,8 +115,7 @@ export async function loadMyPicks(uid: string): Promise<Picks | null> {
   ensureInit();
   const snap = await getDoc(doc(db!, 'picks', uid));
   if (!snap.exists()) return null;
-  const v = snap.data();
-  return { group: v.group || {}, knockout: v.knockout || {} };
+  return asPicks(snap.data());
 }
 
 export async function loadAllPicks(): Promise<{ users: UserInfo[]; picks: Record<string, Picks> }> {
@@ -126,8 +134,7 @@ export async function loadAllPicks(): Promise<{ users: UserInfo[]; picks: Record
   });
   const picks: Record<string, Picks> = {};
   for (const d of pickSnap.docs) {
-    const v = d.data();
-    picks[d.id] = { group: v.group || {}, knockout: v.knockout || {} };
+    picks[d.id] = asPicks(d.data());
   }
   return { users, picks };
 }
