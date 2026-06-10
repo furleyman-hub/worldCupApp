@@ -11,7 +11,7 @@ creating a free Firebase project (the family pool).
 3. Merge/push this code to the `main` branch. The included workflow
    (`.github/workflows/deploy.yml`) builds and deploys automatically.
 4. After the action finishes, the app is live at
-   **https://furleyman-hub.github.io/worldcupapp/**
+   **https://worldcup2026.julianfox.com/**
 
 The schedule, results, and on-device picks all work at this point. The family
 pool (accounts, synced picks, leaderboard) needs step 2.
@@ -25,7 +25,8 @@ pool (accounts, synced picks, leaderboard) needs step 2.
 2. **Enable sign-in:** Build → **Authentication** → Get started →
    **Sign-in method** → enable **Email/Password**.
 3. **Authorize the app's domain:** still in Authentication → **Settings** →
-   **Authorized domains** → Add domain → `furleyman-hub.github.io`.
+   **Authorized domains** → Add domain → `worldcup2026.julianfox.com`
+   (also keep/add `furleyman-hub.github.io` as a fallback).
 4. **Create the database:** Build → **Firestore Database** → Create database →
    production mode → location `nam5 (United States)`.
 5. **Paste the security rules:** Firestore → **Rules** tab → replace the
@@ -42,7 +43,7 @@ pool (accounts, synced picks, leaderboard) needs step 2.
 
 ## 3. Install it on each device
 
-Open **https://furleyman-hub.github.io/worldcupapp/** and then:
+Open **https://worldcup2026.julianfox.com/** and then:
 
 - **Android phone (Chrome):** menu **⋮** → **Add to Home screen** (or
   "Install app").

@@ -2,8 +2,9 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// GitHub Pages serves the app from /<repo>/ — keep this in sync with the repo name.
-const BASE = '/worldCupApp/';
+// Served from the domain root at the custom domain worldcup2026.julianfox.com.
+// (The old furleyman-hub.github.io/worldCupApp/ URL redirects there.)
+const BASE = '/';
 
 export default defineConfig({
   base: BASE,
