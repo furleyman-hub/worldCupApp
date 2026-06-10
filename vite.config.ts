@@ -3,7 +3,7 @@ import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // GitHub Pages serves the app from /<repo>/ — keep this in sync with the repo name.
-const BASE = '/worldcupapp/';
+const BASE = '/worldCupApp/';
 
 export default defineConfig({
   base: BASE,
