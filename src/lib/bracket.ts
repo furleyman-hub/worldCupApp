@@ -102,6 +102,14 @@ export function pickableThirds(picks: Picks): Map<string, string> {
   return m;
 }
 
+/** The user's champion pick, if it is still consistent with their bracket. */
+export function predictedChampion(matches: MergedMatch[], picks: Picks): string | null {
+  const c = picks.knockout['104'];
+  if (!c) return null;
+  const p = resolvePickedBracket(matches, picks).participants[104];
+  return p && (p[0] === c || p[1] === c) ? c : null;
+}
+
 function buildBracket(
   matches: MergedMatch[],
   placed: Map<string, string>,

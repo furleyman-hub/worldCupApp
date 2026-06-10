@@ -6,6 +6,7 @@ import { isPlaceholder, mergeFeed, normTeam, outcomeFromScore, scoreLabel } from
 import { groupTeams } from '../src/lib/standings';
 import {
   bracketColumns,
+  predictedChampion,
   resolveBracket,
   resolvePickedBracket,
   slotLabel
@@ -198,6 +199,8 @@ describe('bracket resolution from picks', () => {
     }
     expect(Object.keys(picks.knockout).length).toBe(31); // 16+8+4+2+1, no third place
     expect(picks.knockout['104']).toBeTruthy();
+    expect(predictedChampion(merged, picks)).toBe(picks.knockout['104']);
+    expect(predictedChampion(merged, allPicks())).toBeNull(); // no knockout picks yet
 
     // reorder one group so its winner changes -> downstream picks get pruned
     const a = picks.groupOrder['A'];
