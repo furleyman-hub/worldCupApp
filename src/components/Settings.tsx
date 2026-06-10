@@ -166,5 +166,11 @@ function humanAuthError(e: Error): string {
   if (m.includes('auth/email-already-in-use')) return 'That email already has an account — sign in instead.';
   if (m.includes('auth/weak-password')) return 'Password must be at least 6 characters.';
   if (m.includes('auth/invalid-email')) return 'That email address looks invalid.';
+  if (m.includes('auth/network-request-failed'))
+    return 'Could not reach the sign-in server. This is usually an ad/tracker blocker (Brave shields, AdGuard, Pi-hole…) or a strict network blocking googleapis.com — turn the blocker off for this site or try cellular data, then retry.';
+  if (m.includes('auth/unauthorized-domain'))
+    return 'This web address is not authorized for sign-in — open the app at worldcup2026.julianfox.com.';
+  if (m.includes('auth/too-many-requests'))
+    return 'Too many attempts — wait a few minutes and try again.';
   return m;
 }
