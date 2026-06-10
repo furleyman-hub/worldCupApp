@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import type { MergedMatch, Picks } from '../lib/types';
-import { pickableThirds, resolvePickedBracket } from '../lib/bracket';
+import { pickableThirds, predictedChampion, resolvePickedBracket } from '../lib/bracket';
 import { groupTeams } from '../lib/standings';
 import { formatET } from '../lib/time';
 import { Bracket } from './BracketView';
@@ -81,11 +81,7 @@ export function MyBracket({
     onChange(prunePicks({ ...picks, knockout }, merged));
   };
 
-  const champion = (() => {
-    const c = picks.knockout['104'];
-    const p = resolution.participants[104];
-    return c && p && (p[0] === c || p[1] === c) ? c : null;
-  })();
+  const champion = predictedChampion(merged, picks);
 
   return (
     <div class="view">

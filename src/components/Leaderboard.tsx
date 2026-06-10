@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
 import { emptyPicks, type MergedMatch, type UserInfo } from '../lib/types';
 import { computeScore, POINTS, type ScoreBreakdown } from '../lib/scoring';
+import { predictedChampion } from '../lib/bracket';
 import { cloudEnabled, loadAllPicks } from '../lib/firebase';
 import { TeamBadge } from './TeamBadge';
 
 interface Row {
   user: UserInfo;
   score: ScoreBreakdown;
+  champion: string | null;
 }
 
 export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: string | null }) {
@@ -18,10 +20,14 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
     setError('');
     try {
       const { users, picks } = await loadAllPicks();
-      const scored: Row[] = users.map((u) => ({
-        user: u,
-        score: computeScore(picks[u.uid] || emptyPicks(), merged)
-      }));
+      const scored: Row[] = users.map((u) => {
+        const p = picks[u.uid] || emptyPicks();
+        return {
+          user: u,
+          score: computeScore(p, merged),
+          champion: predictedChampion(merged, p)
+        };
+      });
       scored.sort(
         (a, b) =>
           b.score.total - a.score.total ||
@@ -74,6 +80,15 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
             <span class="lb-name">
               {r.user.displayName}
               {r.user.uid === myUid ? ' (you)' : ''}
+            </span>
+            <span class="lb-champ" title="Champion pick">
+              {r.champion ? (
+                <>
+                  🏆 <TeamBadge team={r.champion} />
+                </>
+              ) : (
+                <span class="lb-nochamp">no champion yet</span>
+              )}
             </span>
             <span class="lb-pts">{r.score.total} pts</span>
           </div>

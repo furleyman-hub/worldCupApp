@@ -537,6 +537,16 @@ a {
   flex: 1;
   font-weight: 600;
 }
+.lb-champ {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.lb-nochamp {
+  color: var(--dim);
+  font-size: 11px;
+}
 .lb-pts {
   font-weight: 700;
   color: var(--accent);
