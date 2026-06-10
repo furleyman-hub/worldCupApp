@@ -15,3 +15,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+// Shared passphrase the family must type when creating an account.
+// A light gate against strangers signing up — change it to anything you like.
+export const FAMILY_PASSPHRASE = 'usawins';
