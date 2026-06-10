@@ -1,0 +1,27 @@
+{
+  "name": "worldcup2026-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "fetch-schedule": "node scripts/fetch-schedule.mjs",
+    "pick-flags": "node scripts/pick-flags.mjs",
+    "gen-rules": "node scripts/gen-rules.mjs"
+  },
+  "dependencies": {
+    "firebase": "^11.9.0",
+    "preact": "^10.26.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.0",
+    "flag-icons": "^7.3.2",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0",
+    "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^3.2.0"
+  }
+}

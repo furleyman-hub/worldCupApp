@@ -1,0 +1,137 @@
+import { useEffect, useState } from 'preact/hooks';
+import type { MergedMatch, UserInfo } from '../lib/types';
+import { computeScore, POINTS, type ScoreBreakdown } from '../lib/scoring';
+import { cloudEnabled, loadAllPicks } from '../lib/firebase';
+import { TeamBadge } from './TeamBadge';
+
+interface Row {
+  user: UserInfo;
+  score: ScoreBreakdown;
+}
+
+export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: string | null }) {
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [error, setError] = useState('');
+  const [open, setOpen] = useState<string | null>(null);
+
+  const load = async () => {
+    setError('');
+    try {
+      const { users, picks } = await loadAllPicks();
+      const scored: Row[] = users.map((u) => ({
+        user: u,
+        score: computeScore(picks[u.uid] || { group: {}, knockout: {} }, merged)
+      }));
+      scored.sort(
+        (a, b) =>
+          b.score.total - a.score.total ||
+          b.score.groupCorrect - a.score.groupCorrect ||
+          a.user.joinedAt - b.user.joinedAt
+      );
+      setRows(scored);
+    } catch (e) {
+      setError(`Could not load the pool: ${(e as Error).message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (cloudEnabled) load();
+  }, [merged]);
+
+  if (!cloudEnabled) {
+    return (
+      <div class="view">
+        <section class="card">
+          <h2>Family pool</h2>
+          <p>
+            The shared pool isn't configured yet. Follow <b>SETUP.md</b> in the repository to
+            create the free Firebase project, then everyone can sign up and compare brackets here.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div class="view">
+      <div class="bar">
+        <h2>Leaderboard</h2>
+        <button class="btn" onClick={load}>
+          ↻ Refresh
+        </button>
+      </div>
+      {error && <p class="error">{error}</p>}
+      {!rows && !error && <p class="note">Loading…</p>}
+      {rows && rows.length === 0 && <p class="note">No players yet — be the first to sign up!</p>}
+      {rows?.map((r, i) => (
+        <section
+          class={`card lb-row${r.user.uid === myUid ? ' me' : ''}`}
+          key={r.user.uid}
+          onClick={() => setOpen(open === r.user.uid ? null : r.user.uid)}
+        >
+          <div class="lb-line">
+            <span class="lb-rank">{i + 1}</span>
+            <span class="lb-name">
+              {r.user.displayName}
+              {r.user.uid === myUid ? ' (you)' : ''}
+            </span>
+            <span class="lb-pts">{r.score.total} pts</span>
+          </div>
+          {open === r.user.uid && <Breakdown s={r.score} />}
+        </section>
+      ))}
+      <ScoringRules />
+    </div>
+  );
+}
+
+function Breakdown({ s }: { s: ScoreBreakdown }) {
+  const round = (label: string, teams: string[], pts: number) => (
+    <div class="bd-row">
+      <span>
+        {label} ({pts} pts each)
+      </span>
+      <span class="bd-teams">
+        {teams.length ? teams.map((t) => <TeamBadge team={t} />) : '—'}
+      </span>
+    </div>
+  );
+  return (
+    <div class="breakdown">
+      <div class="bd-row">
+        <span>Group matches</span>
+        <span>
+          {s.groupCorrect}/{s.groupDecided} correct = {s.group} pts
+        </span>
+      </div>
+      {round('Reached Round of 16', s.r16, POINTS.r16)}
+      {round('Reached Quarter-finals', s.qf, POINTS.qf)}
+      {round('Reached Semi-finals', s.sf, POINTS.sf)}
+      {round('Reached Final', s.final, POINTS.final)}
+      <div class="bd-row">
+        <span>Champion ({POINTS.champion} pts)</span>
+        <span class="bd-teams">{s.champion ? <TeamBadge team={s.champion} /> : '—'}</span>
+      </div>
+    </div>
+  );
+}
+
+export function ScoringRules() {
+  return (
+    <section class="card">
+      <h2>How scoring works (200 max)</h2>
+      <ul class="rules">
+        <li>Correct group-match result (win/draw/win): 1 pt × 72</li>
+        <li>Each team you correctly send to the Round of 16: 2 pts × 16</li>
+        <li>Each team you correctly send to the Quarter-finals: 4 pts × 8</li>
+        <li>Each team you correctly send to the Semi-finals: 6 pts × 4</li>
+        <li>Each team you correctly send to the Final: 10 pts × 2</li>
+        <li>Correct champion: 20 pts</li>
+      </ul>
+      <p class="note">
+        Knockout points count a team reaching that round anywhere in your bracket, so you aren't
+        punished by FIFA's third-place slot shuffling. Ties break on correct group picks.
+      </p>
+    </section>
+  );
+}
