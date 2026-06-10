@@ -1,0 +1,160 @@
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { User } from 'firebase/auth';
+import scheduleJson from './data/schedule.json';
+import type { Picks, ScheduleMatch } from './lib/types';
+import { cachedFeed, fetchFeed, mergeFeed, type FeedCache } from './lib/feed';
+import { groupTables } from './lib/standings';
+import { resolveBracket } from './lib/bracket';
+import {
+  cloudEnabled,
+  loadLocalPicks,
+  loadMyPicks,
+  saveLocalPicks,
+  savePicksCloud,
+  watchAuth
+} from './lib/firebase';
+import { timeAgo } from './lib/time';
+import { ScheduleView } from './components/ScheduleView';
+import { BracketView } from './components/BracketView';
+import { MyBracket } from './components/MyBracket';
+import { Leaderboard } from './components/Leaderboard';
+import { Settings } from './components/Settings';
+
+const SCHEDULE = scheduleJson as ScheduleMatch[];
+
+type Tab = 'groups' | 'bracket' | 'picks' | 'pool' | 'more';
+
+const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'groups', icon: '📅', label: 'Schedule' },
+  { id: 'bracket', icon: '🏆', label: 'Bracket' },
+  { id: 'picks', icon: '✏️', label: 'My Picks' },
+  { id: 'pool', icon: '🥇', label: 'Pool' },
+  { id: 'more', icon: '⚙️', label: 'More' }
+];
+
+export function App() {
+  const [tab, setTab] = useState<Tab>(
+    () => (location.hash.replace('#', '') as Tab) || 'groups'
+  );
+  const [feed, setFeed] = useState<FeedCache | null>(() => cachedFeed());
+  const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [picks, setPicks] = useState<Picks>(() => loadLocalPicks());
+  const [saveState, setSaveState] = useState('');
+  const saveTimer = useRef<number | undefined>(undefined);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      setFeed(await fetchFeed());
+      setOffline(false);
+    } catch {
+      setOffline(true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // refresh whenever the app opens or comes back to the foreground
+  useEffect(() => {
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  useEffect(
+    () =>
+      watchAuth((u) => {
+        setUser(u);
+        if (!u) return;
+        // cloud picks win on sign-in; if none exist yet, push the local ones up
+        loadMyPicks(u.uid)
+          .then((cloud) => {
+            if (cloud) {
+              setPicks(cloud);
+              saveLocalPicks(cloud);
+            } else {
+              savePicksCloud(u.uid, loadLocalPicks()).catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }),
+    []
+  );
+
+  const goTab = (t: Tab) => {
+    setTab(t);
+    try {
+      history.replaceState(null, '', `#${t}`);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const merged = useMemo(() => mergeFeed(SCHEDULE, feed), [feed]);
+  const tables = useMemo(() => groupTables(merged), [merged]);
+  const actualResolution = useMemo(() => resolveBracket(merged), [merged]);
+
+  const changePicks = (p: Picks) => {
+    setPicks(p);
+    saveLocalPicks(p);
+    if (cloudEnabled && user) {
+      // debounce cloud writes — group picking is tap-heavy
+      setSaveState('saving…');
+      clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(async () => {
+        try {
+          await savePicksCloud(user.uid, p);
+          setSaveState('saved ✓');
+        } catch (e) {
+          setSaveState(`save failed: ${(e as Error).message}`);
+        }
+      }, 1200);
+    }
+  };
+
+  return (
+    <div class="shell">
+      <header class="topbar">
+        <span class="title">⚽ World Cup 2026</span>
+        <span class="updated">
+          {offline ? '⚠ offline · ' : ''}
+          {feed ? timeAgo(feed.fetchedAt) : 'no data yet'}
+          {tab === 'picks' && saveState ? ` · ${saveState}` : ''}
+        </span>
+        <button class="refresh" onClick={refresh} disabled={refreshing} aria-label="Refresh results">
+          {refreshing ? '…' : '↻'}
+        </button>
+      </header>
+
+      <main class="content">
+        {tab === 'groups' && <ScheduleView merged={merged} tables={tables} />}
+        {tab === 'bracket' && <BracketView merged={merged} resolution={actualResolution} />}
+        {tab === 'picks' && <MyBracket merged={merged} picks={picks} onChange={changePicks} />}
+        {tab === 'pool' && <Leaderboard merged={merged} myUid={user?.uid ?? null} />}
+        {tab === 'more' && (
+          <Settings
+            user={user}
+            lastUpdated={feed?.fetchedAt ?? null}
+            offline={offline}
+            onRefresh={refresh}
+            refreshing={refreshing}
+          />
+        )}
+      </main>
+
+      <nav class="tabbar">
+        {TABS.map((t) => (
+          <button key={t.id} class={tab === t.id ? 'on' : ''} onClick={() => goTab(t.id)}>
+            <span class="t-icon">{t.icon}</span>
+            <span class="t-label">{t.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}

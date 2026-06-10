@@ -1,2 +1,47 @@
-# worldCupApp
-Android app to track would cup 2026 game schedule and bracket
+# World Cup 2026 Tracker
+
+A free, installable web app (PWA) for following the 2026 FIFA World Cup and
+running a family prediction pool. Works on Android phones (Chrome), Kindle
+Fire tablets (Silk or Firefox), and iPhones (Safari).
+
+**Live app:** https://furleyman-hub.github.io/worldcupapp/ (after setup — see
+[SETUP.md](SETUP.md))
+
+## Features
+
+- **Schedule** — all 104 matches with date, venue, and kickoff in US Eastern
+  Time; group stage by group (with live standings tables showing points) or
+  by date.
+- **Bracket** — the knockout rounds drawn as a graphical tournament bracket,
+  filled in as real results arrive. Knockout matches follow FIFA rules:
+  extra time, then penalty shoot-out — no draws.
+- **Results** — refreshed automatically every time the app opens (and a ↻
+  button), from the free public-domain
+  [openfootball](https://github.com/openfootball/worldcup.json) dataset.
+- **My Picks** — predict the result of every group match (win/draw/win), and
+  your predicted standings build your own Round of 32; tap teams through the
+  bracket to your champion. Picks lock at kickoff.
+- **Pool** — everyone's brackets scored live against the real tournament
+  (200 points max), with a leaderboard.
+- Every team shows its flag and FIFA code; tap any match for full country
+  names, venue, and details.
+
+## Tech
+
+Vite + Preact + TypeScript PWA hosted on GitHub Pages; Firebase free Spark
+tier (email/password auth + Firestore) for the shared pool. No paid services
+anywhere. All scoring is computed client-side; Firestore security rules
+(generated with per-match kickoff timestamps) enforce pick locking
+server-side.
+
+```bash
+npm install
+npm run dev        # local development
+npm test           # unit tests (standings, bracket, scoring, feed merge)
+npm run build      # production build into dist/
+```
+
+Data pipeline scripts: `npm run fetch-schedule` (regenerate the canonical
+schedule from the feed, with validation), `npm run pick-flags` (copy the 48
+team flag SVGs from flag-icons), `npm run gen-rules` (regenerate
+`firestore.rules`).
