@@ -4,7 +4,7 @@ A free, installable web app (PWA) for following the 2026 FIFA World Cup and
 running a family prediction pool. Works on Android phones (Chrome), Kindle
 Fire tablets (Silk or Firefox), and iPhones (Safari).
 
-**Live app:** https://furleyman-hub.github.io/worldcupapp/ (after setup — see
+**Live app:** https://worldcup2026.julianfox.com/ (after setup — see
 [SETUP.md](SETUP.md))
 
 ## Features
