@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import scheduleJson from '../src/data/schedule.json';
 import teamsJson from '../src/data/teams.json';
-import type { MergedMatch, Picks, ScheduleMatch } from '../src/lib/types';
+import { emptyPicks, type MergedMatch, type Picks, type ScheduleMatch } from '../src/lib/types';
 import { isPlaceholder, mergeFeed, normTeam, outcomeFromScore, scoreLabel } from '../src/lib/feed';
-import { groupTables } from '../src/lib/standings';
-import { bracketColumns, resolveBracket, slotLabel } from '../src/lib/bracket';
+import { groupTeams } from '../src/lib/standings';
+import {
+  bracketColumns,
+  resolveBracket,
+  resolvePickedBracket,
+  slotLabel
+} from '../src/lib/bracket';
 import { computeScore } from '../src/lib/scoring';
 import { prunePicks } from '../src/components/MyBracket';
 
@@ -137,28 +142,28 @@ describe('feed merge', () => {
   });
 });
 
-/** Picks where the alphabetically-first team of each pair always wins. */
+/**
+ * Picks where every group finishes in alphabetical order, with the 8 thirds
+ * that would actually qualify in that scenario (identical records, so the
+ * alphabetically-first 8 third-place teams win the tiebreak).
+ */
 function allPicks(): Picks {
-  const picks: Picks = { group: {}, knockout: {} };
-  for (const m of SCHEDULE) {
-    if (m.stage !== 'group') continue;
-    picks.group[String(m.num)] = m.team1! < m.team2! ? 'team1' : 'team2';
+  const picks = emptyPicks();
+  const teams = groupTeams(mergeFeed(SCHEDULE, null));
+  for (const [g, list] of Object.entries(teams)) {
+    picks.groupOrder[g] = [...list].sort();
   }
+  picks.thirds = Object.values(picks.groupOrder)
+    .map((o) => o[2])
+    .sort()
+    .slice(0, 8);
   return picks;
 }
 
-describe('standings + bracket resolution from picks', () => {
-  it('derives complete predicted tables and resolves all R32 slots', () => {
+describe('bracket resolution from picks', () => {
+  it('resolves all R32 slots from complete orders and 8 thirds', () => {
     const merged = mergeFeed(SCHEDULE, null);
-    const picks = allPicks();
-    const tables = groupTables(merged, (n) => picks.group[String(n)]);
-    expect(Object.keys(tables).length).toBe(12);
-    for (const rows of Object.values(tables)) {
-      expect(rows.length).toBe(4);
-      expect(rows[0].pts).toBeGreaterThanOrEqual(rows[1].pts);
-      expect(rows.reduce((s, r) => s + r.pts, 0)).toBeGreaterThan(0);
-    }
-    const res = resolveBracket(merged, { pickOutcome: (n) => picks.group[String(n)] });
+    const res = resolvePickedBracket(merged, allPicks());
     expect(res.thirdQualifiers.length).toBe(8);
     for (const m of merged.filter((m) => m.stage === 'r32')) {
       const [a, b] = res.participants[m.num];
@@ -172,30 +177,35 @@ describe('standings + bracket resolution from picks', () => {
     expect(new Set(all).size).toBe(32);
   });
 
+  it('leaves the bracket empty while orders or thirds are incomplete', () => {
+    const merged = mergeFeed(SCHEDULE, null);
+    const partial = allPicks();
+    partial.thirds = partial.thirds.slice(0, 7);
+    const res = resolvePickedBracket(merged, partial);
+    const withThird = merged.find((m) => m.stage === 'r32' && m.slot2!.startsWith('3'))!;
+    expect(res.participants[withThird.num][1]).toBeNull();
+  });
+
   it('propagates knockout picks down the bracket and prunes stale ones', () => {
     const merged = mergeFeed(SCHEDULE, null);
     const picks = allPicks();
-    let res = resolveBracket(merged, { pickOutcome: (n) => picks.group[String(n)] });
     // pick every knockout winner = first participant
     for (const m of merged) {
       if (m.stage === 'group') continue;
-      res = resolveBracket(merged, {
-        pickOutcome: (n) => picks.group[String(n)],
-        pickWinner: (n) => picks.knockout[String(n)]
-      });
+      const res = resolvePickedBracket(merged, picks);
       const [a] = res.participants[m.num];
       if (a && m.num !== 103) picks.knockout[String(m.num)] = a;
     }
     expect(Object.keys(picks.knockout).length).toBe(31); // 16+8+4+2+1, no third place
-    const champion = picks.knockout['104'];
-    expect(champion).toBeTruthy();
+    expect(picks.knockout['104']).toBeTruthy();
 
-    // flip one group so its winner changes -> downstream picks get pruned
-    const g = merged.find((m) => m.num === 1)!;
-    picks.group['1'] = picks.group['1'] === 'team1' ? 'team2' : 'team1';
+    // reorder one group so its winner changes -> downstream picks get pruned
+    const a = picks.groupOrder['A'];
+    picks.groupOrder['A'] = [a[2], a[1], a[0], a[3]]; // old 3rd now wins the group
     const pruned = prunePicks(picks, merged);
     expect(Object.keys(pruned.knockout).length).toBeLessThan(31);
-    void g;
+    // the old 3rd-place pick is no longer 3rd, so it falls out of the thirds
+    expect(pruned.thirds.includes(a[2])).toBe(false);
   });
 });
 
@@ -224,16 +234,17 @@ describe('bracket display ordering', () => {
 
 describe('scoring', () => {
   function playResults(picks: Picks): MergedMatch[] {
-    // simulate a tournament where exactly the user's picks happen,
-    // propagating actual winners stage by stage like the real event
+    // simulate a tournament where exactly the user's picks happen: every
+    // group finishes alphabetically (earlier name wins 1-0), then the user's
+    // picked winner takes each knockout match
     const merged = mergeFeed(SCHEDULE, null).map((m) => {
       if (m.stage !== 'group') return m;
-      const o = picks.group[String(m.num)];
-      const score: [number, number] = o === 'team1' ? [1, 0] : o === 'team2' ? [0, 1] : [1, 1];
+      const o = m.team1! < m.team2! ? ('team1' as const) : ('team2' as const);
+      const score: [number, number] = o === 'team1' ? [1, 0] : [0, 1];
       return { ...m, score: { ft: score }, outcome: o };
     });
     for (const stage of ['r32', 'r16', 'qf', 'sf', 'third', 'final'] as const) {
-      const res = resolveBracket(merged, {});
+      const res = resolveBracket(merged);
       for (const m of merged) {
         if (m.stage !== stage) continue;
         const [a, b] = res.participants[m.num];
@@ -251,15 +262,12 @@ describe('scoring', () => {
     return merged;
   }
 
-  it('awards a perfect bracket 200 points', () => {
+  it('awards a perfect bracket 192 points', () => {
     const picks = allPicks();
     const merged0 = mergeFeed(SCHEDULE, null);
     // fill knockout picks = first participant at each step
     for (const stage of ['r32', 'r16', 'qf', 'sf', 'final'] as const) {
-      const res = resolveBracket(merged0, {
-        pickOutcome: (n) => picks.group[String(n)],
-        pickWinner: (n) => picks.knockout[String(n)]
-      });
+      const res = resolvePickedBracket(merged0, picks);
       for (const m of merged0.filter((m) => m.stage === stage)) {
         const [a] = res.participants[m.num];
         if (a) picks.knockout[String(m.num)] = a;
@@ -267,20 +275,30 @@ describe('scoring', () => {
     }
     const played = playResults(picks);
     const s = computeScore(picks, played);
-    expect(s.groupCorrect).toBe(72);
+    expect(s.positionCorrect).toBe(48);
+    expect(s.thirds.length).toBe(8);
     expect(s.r16.length).toBe(16);
     expect(s.qf.length).toBe(8);
     expect(s.sf.length).toBe(4);
     expect(s.final.length).toBe(2);
     expect(s.champion).toBeTruthy();
-    expect(s.total).toBe(200);
+    expect(s.total).toBe(192);
   });
 
-  it('scores zero with no picks and partial credit for group-only picks', () => {
+  it('scores zero with no picks and partial credit for group-stage-only picks', () => {
     const picks = allPicks();
     const played = playResults(picks);
-    expect(computeScore({ group: {}, knockout: {} }, played).total).toBe(0);
-    const groupOnly = computeScore({ group: picks.group, knockout: {} }, played);
-    expect(groupOnly.total).toBe(72);
+    expect(computeScore(emptyPicks(), played).total).toBe(0);
+    const groupOnly = computeScore({ ...allPicks(), knockout: {} }, played);
+    // 48 exact positions + 8 correct thirds x 2 pts
+    expect(groupOnly.total).toBe(64);
+  });
+
+  it('does not score positions of unfinished groups', () => {
+    const picks = allPicks();
+    const merged = mergeFeed(SCHEDULE, null); // no results at all
+    const s = computeScore(picks, merged);
+    expect(s.positionDecided).toBe(0);
+    expect(s.total).toBe(0);
   });
 });

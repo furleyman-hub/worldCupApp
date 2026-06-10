@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { MergedMatch, UserInfo } from '../lib/types';
+import { emptyPicks, type MergedMatch, type UserInfo } from '../lib/types';
 import { computeScore, POINTS, type ScoreBreakdown } from '../lib/scoring';
 import { cloudEnabled, loadAllPicks } from '../lib/firebase';
 import { TeamBadge } from './TeamBadge';
@@ -20,12 +20,12 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
       const { users, picks } = await loadAllPicks();
       const scored: Row[] = users.map((u) => ({
         user: u,
-        score: computeScore(picks[u.uid] || { group: {}, knockout: {} }, merged)
+        score: computeScore(picks[u.uid] || emptyPicks(), merged)
       }));
       scored.sort(
         (a, b) =>
           b.score.total - a.score.total ||
-          b.score.groupCorrect - a.score.groupCorrect ||
+          b.score.positionCorrect - a.score.positionCorrect ||
           a.user.joinedAt - b.user.joinedAt
       );
       setRows(scored);
@@ -99,11 +99,12 @@ function Breakdown({ s }: { s: ScoreBreakdown }) {
   return (
     <div class="breakdown">
       <div class="bd-row">
-        <span>Group matches</span>
+        <span>Group positions</span>
         <span>
-          {s.groupCorrect}/{s.groupDecided} correct = {s.group} pts
+          {s.positionCorrect}/{s.positionDecided} correct = {s.position} pts
         </span>
       </div>
+      {round('Third-place qualifiers', s.thirds, POINTS.third)}
       {round('Reached Round of 16', s.r16, POINTS.r16)}
       {round('Reached Quarter-finals', s.qf, POINTS.qf)}
       {round('Reached Semi-finals', s.sf, POINTS.sf)}
@@ -119,9 +120,10 @@ function Breakdown({ s }: { s: ScoreBreakdown }) {
 export function ScoringRules() {
   return (
     <section class="card">
-      <h2>How scoring works (200 max)</h2>
+      <h2>How scoring works (192 max)</h2>
       <ul class="rules">
-        <li>Correct group-match result (win/draw/win): 1 pt × 72</li>
+        <li>Team placed in its exact group finishing position: 1 pt × 48</li>
+        <li>Each third-place qualifier you called right: 2 pts × 8</li>
         <li>Each team you correctly send to the Round of 16: 2 pts × 16</li>
         <li>Each team you correctly send to the Quarter-finals: 4 pts × 8</li>
         <li>Each team you correctly send to the Semi-finals: 6 pts × 4</li>
@@ -129,8 +131,9 @@ export function ScoringRules() {
         <li>Correct champion: 20 pts</li>
       </ul>
       <p class="note">
+        Group positions score once a group finishes; thirds score once all groups are done.
         Knockout points count a team reaching that round anywhere in your bracket, so you aren't
-        punished by FIFA's third-place slot shuffling. Ties break on correct group picks.
+        punished by FIFA's third-place slot shuffling. Ties break on correct group positions.
       </p>
     </section>
   );

@@ -18,11 +18,12 @@ Fire tablets (Silk or Firefox), and iPhones (Safari).
 - **Results** — refreshed automatically every time the app opens (and a ↻
   button), from the free public-domain
   [openfootball](https://github.com/openfootball/worldcup.json) dataset.
-- **My Picks** — predict the result of every group match (win/draw/win), and
-  your predicted standings build your own Round of 32; tap teams through the
-  bracket to your champion. Picks lock at kickoff.
+- **My Picks** — order each group's teams 1st→4th, choose the 8 third-place
+  qualifiers, and your Round of 32 builds itself; tap teams through the
+  bracket to your champion. Group picks lock at the opening kickoff, knockout
+  picks at the first Round-of-32 game.
 - **Pool** — everyone's brackets scored live against the real tournament
-  (200 points max), with a leaderboard.
+  (192 points max), with a leaderboard.
 - Every team shows its flag and FIFA code; tap any match for full country
   names, venue, and details.
 
@@ -31,7 +32,7 @@ Fire tablets (Silk or Firefox), and iPhones (Safari).
 Vite + Preact + TypeScript PWA hosted on GitHub Pages; Firebase free Spark
 tier (email/password auth + Firestore) for the shared pool. No paid services
 anywhere. All scoring is computed client-side; Firestore security rules
-(generated with per-match kickoff timestamps) enforce pick locking
+(generated with the schedule's kickoff timestamps) enforce pick locking
 server-side.
 
 ```bash

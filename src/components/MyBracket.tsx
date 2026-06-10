@@ -1,32 +1,36 @@
-import type { ComponentChildren } from 'preact';
 import { useMemo } from 'preact/hooks';
-import type { MergedMatch, Outcome, Picks } from '../lib/types';
-import { resolveBracket } from '../lib/bracket';
-import { groupTables } from '../lib/standings';
+import type { MergedMatch, Picks } from '../lib/types';
+import { pickableThirds, resolvePickedBracket } from '../lib/bracket';
+import { groupTeams } from '../lib/standings';
 import { formatET } from '../lib/time';
 import { Bracket } from './BracketView';
-import { GroupTable } from './ScheduleView';
 import { TeamBadge, teamInfo } from './TeamBadge';
 
 const GROUPS = 'ABCDEFGHIJKL'.split('');
+const POS_LABELS = ['1st', '2nd', '3rd', '4th'];
+
+/** Group orders and third-place picks lock at the tournament's first kickoff. */
+export function groupLockTime(merged: MergedMatch[]): number {
+  return Math.min(...merged.filter((m) => m.stage === 'group').map((m) => m.kickoff));
+}
 
 /** Knockout picks all lock at the first Round-of-32 kickoff. */
 export function knockoutLockTime(merged: MergedMatch[]): number {
   return Math.min(...merged.filter((m) => m.stage === 'r32').map((m) => m.kickoff));
 }
 
-/** Drop knockout picks that are no longer reachable after an edit. */
+/** Drop thirds and knockout picks that are no longer reachable after an edit. */
 export function prunePicks(picks: Picks, merged: MergedMatch[]): Picks {
-  const res = resolveBracket(merged, {
-    pickOutcome: (num) => picks.group[String(num)],
-    pickWinner: (num) => picks.knockout[String(num)]
-  });
+  const valid = pickableThirds(picks);
+  const thirds = picks.thirds.filter((t) => valid.has(t));
+
+  const res = resolvePickedBracket(merged, { ...picks, thirds });
   const knockout: Record<string, string> = {};
   for (const [k, team] of Object.entries(picks.knockout)) {
     const p = res.participants[Number(k)];
     if (p && (p[0] === team || p[1] === team)) knockout[k] = team;
   }
-  return { ...picks, knockout };
+  return { ...picks, thirds, knockout };
 }
 
 export function MyBracket({
@@ -40,30 +44,36 @@ export function MyBracket({
   onChange: (p: Picks) => void;
   now?: number;
 }) {
-  const resolution = useMemo(
-    () =>
-      resolveBracket(merged, {
-        pickOutcome: (num) => picks.group[String(num)],
-        pickWinner: (num) => picks.knockout[String(num)]
-      }),
-    [merged, picks]
-  );
-  const predictedTables = useMemo(
-    () => groupTables(merged, (num) => picks.group[String(num)]),
-    [merged, picks]
-  );
+  const resolution = useMemo(() => resolvePickedBracket(merged, picks), [merged, picks]);
+  const teamsByGroup = useMemo(() => groupTeams(merged), [merged]);
 
+  const groupLock = groupLockTime(merged);
+  const groupLocked = now >= groupLock;
   const koLock = knockoutLockTime(merged);
   const koLocked = now >= koLock;
-  const groupPicked = Object.keys(picks.group).length;
-  const koPicked = Object.keys(picks.knockout).length;
 
-  const setGroupPick = (num: number, outcome: Outcome) => {
-    const key = String(num);
-    const group = { ...picks.group };
-    if (group[key] === outcome) delete group[key];
-    else group[key] = outcome;
-    onChange(prunePicks({ ...picks, group }, merged));
+  const orderedGroups = GROUPS.filter((g) => (picks.groupOrder[g] || []).length === 4).length;
+  const thirdOptions = pickableThirds(picks);
+
+  // Tap an unplaced team to give it the next position; tap a placed team to
+  // redo the order from that position down.
+  const tapTeam = (g: string, team: string) => {
+    const order = picks.groupOrder[g] || [];
+    const at = order.indexOf(team);
+    const next = at >= 0 ? order.slice(0, at) : [...order, team];
+    const groupOrder = { ...picks.groupOrder };
+    if (next.length) groupOrder[g] = next;
+    else delete groupOrder[g];
+    onChange(prunePicks({ ...picks, groupOrder }, merged));
+  };
+
+  const tapThird = (team: string) => {
+    const thirds = picks.thirds.includes(team)
+      ? picks.thirds.filter((t) => t !== team)
+      : picks.thirds.length < 8
+        ? [...picks.thirds, team]
+        : picks.thirds;
+    onChange(prunePicks({ ...picks, thirds }, merged));
   };
 
   const setKoPick = (num: number, team: string) => {
@@ -81,10 +91,10 @@ export function MyBracket({
     <div class="view">
       <section class="card hint">
         <p>
-          Pick the result of all 72 group matches ({groupPicked}/72 done). Your predicted group
-          tables build your own Round of 32 — then tap teams to advance them to the title
-          ({koPicked}/32 knockout picks). Group picks lock at each match's kickoff; the knockout
-          bracket locks at the first Round-of-32 game.
+          Three steps: order each group's teams 1st→4th ({orderedGroups}/12 groups done), choose
+          the 8 third-place teams that advance ({picks.thirds.length}/8), then tap teams through
+          your Round of 32 bracket to the title. Group picks lock at the opening kickoff; the
+          knockout bracket locks at the first Round-of-32 game.
         </p>
         {champion && (
           <p class="champ">
@@ -93,48 +103,87 @@ export function MyBracket({
         )}
       </section>
 
-      <h2 class="section-title">Group stage picks</h2>
-      {GROUPS.map((g) => (
-        <section class="card" key={g}>
-          <h2>Group {g}</h2>
-          {predictedTables[g] && <GroupTable rows={predictedTables[g]} compact />}
-          {merged
-            .filter((m) => m.stage === 'group' && m.group === g)
-            .sort((a, b) => a.kickoff - b.kickoff)
-            .map((m) => {
-              const locked = now >= m.kickoff;
-              const pick = picks.group[String(m.num)];
-              const opt = (o: Outcome, label: ComponentChildren) => (
+      <h2 class="section-title">
+        1. Group finishing order{' '}
+        {groupLocked
+          ? '🔒 (locked)'
+          : `— open until ${formatET(new Date(groupLock).toISOString(), '')}`}
+      </h2>
+      <p class="note">
+        Tap teams in finishing order: first tap is the group winner, last is 4th. Tap a placed
+        team to redo from there. Top 2 advance; 3rd place might.
+      </p>
+      {GROUPS.map((g) => {
+        const order = picks.groupOrder[g] || [];
+        return (
+          <section class="card" key={g}>
+            <h2>Group {g}</h2>
+            {(teamsByGroup[g] || []).map((team) => {
+              const pos = order.indexOf(team);
+              return (
                 <button
-                  class={`pick-opt${pick === o ? ' on' : ''}`}
-                  disabled={locked}
-                  onClick={() => setGroupPick(m.num, o)}
+                  class={`order-row${pos >= 0 ? ` placed p${pos}` : ''}`}
+                  disabled={groupLocked}
+                  onClick={() => tapTeam(g, team)}
+                  key={team}
                 >
-                  {label}
+                  <span class="order-pos">{pos >= 0 ? POS_LABELS[pos] : '·'}</span>
+                  <TeamBadge team={team} />
+                  <span class="order-name">{teamInfo(team)?.name}</span>
                 </button>
               );
-              return (
-                <div class={`pick-row${locked ? ' locked' : ''}`} key={m.num}>
-                  <span class="pick-when">
-                    {locked ? '🔒' : ''} {formatET(m.dateUtc, m.etDisplay).replace(/^\w+, /, '')}
-                  </span>
-                  <div class="pick-opts">
-                    {opt('team1', <TeamBadge team={m.team1} />)}
-                    {opt('draw', 'Draw')}
-                    {opt('team2', <TeamBadge team={m.team2} right />)}
-                  </div>
-                </div>
-              );
             })}
-        </section>
-      ))}
+          </section>
+        );
+      })}
 
       <h2 class="section-title">
-        Knockout picks{' '}
+        2. Third-place qualifiers{' '}
+        {groupLocked
+          ? '🔒 (locked)'
+          : `— pick 8 of 12 (${picks.thirds.length}/8)`}
+      </h2>
+      <section class="card">
+        {thirdOptions.size === 0 ? (
+          <p class="note">Finish ordering your groups first — your 3rd-place teams appear here.</p>
+        ) : (
+          <>
+            <div class="thirds-grid">
+              {GROUPS.map((g) => {
+                const order = picks.groupOrder[g] || [];
+                if (order.length !== 4) return null;
+                const team = order[2];
+                const on = picks.thirds.includes(team);
+                const full = !on && picks.thirds.length >= 8;
+                return (
+                  <button
+                    class={`pick-opt${on ? ' on' : ''}`}
+                    disabled={groupLocked || full}
+                    onClick={() => tapThird(team)}
+                    key={g}
+                  >
+                    <TeamBadge team={team} />
+                  </button>
+                );
+              })}
+            </div>
+            {thirdOptions.size < 12 && (
+              <p class="note">
+                {12 - thirdOptions.size} more group{thirdOptions.size === 11 ? '' : 's'} to order
+                before all 12 candidates show.
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      <h2 class="section-title">
+        3. Knockout bracket{' '}
         {koLocked ? '🔒 (locked)' : `— open until ${formatET(new Date(koLock).toISOString(), '')}`}
       </h2>
       <p class="note">
-        Slots appear as you finish each group's picks. Tap a team to advance it to the next round.
+        Your Round of 32 fills in once all groups are ordered and 8 thirds are chosen. Tap a team
+        to advance it to the next round.
       </p>
       <Bracket
         merged={merged}

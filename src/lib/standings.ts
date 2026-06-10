@@ -1,19 +1,14 @@
-import type { MergedMatch, Outcome, TableRow } from './types';
+import type { MergedMatch, TableRow } from './types';
 
 /**
- * Group tables. Two modes:
- *  - actual results: outcomes + goals from merged feed scores (FT incl. any
- *    stoppage; group matches have no extra time)
- *  - predicted: outcomes from a user's picks (no goals — W/D/L and points only)
+ * Group tables from actual results: outcomes + goals from merged feed scores
+ * (FT incl. any stoppage; group matches have no extra time).
  *
  * Sort: points, goal difference, goals for, then team name. (FIFA also applies
  * head-to-head and fair-play criteria; this is a documented simplification —
  * the real bracket always comes from the live feed, never from this table.)
  */
-export function groupTables(
-  matches: MergedMatch[],
-  pickOutcome?: (num: number) => Outcome | undefined
-): Record<string, TableRow[]> {
+export function groupTables(matches: MergedMatch[]): Record<string, TableRow[]> {
   const rows = new Map<string, TableRow>();
   const groupsOf = new Map<string, Set<string>>();
 
@@ -24,20 +19,19 @@ export function groupTables(
       if (!groupsOf.has(m.group!)) groupsOf.set(m.group!, new Set());
       groupsOf.get(m.group!)!.add(t);
     }
-    const outcome = pickOutcome ? pickOutcome(m.num) : m.outcome;
-    if (!outcome) continue;
+    if (!m.outcome) continue;
     const r1 = rows.get(m.team1!)!;
     const r2 = rows.get(m.team2!)!;
     r1.p++;
     r2.p++;
-    if (!pickOutcome && m.score?.ft) {
+    if (m.score?.ft) {
       const [g1, g2] = m.score.ft;
       r1.gf += g1; r1.ga += g2;
       r2.gf += g2; r2.ga += g1;
     }
-    if (outcome === 'team1') {
+    if (m.outcome === 'team1') {
       r1.w++; r1.pts += 3; r2.l++;
-    } else if (outcome === 'team2') {
+    } else if (m.outcome === 'team2') {
       r2.w++; r2.pts += 3; r1.l++;
     } else {
       r1.d++; r2.d++; r1.pts++; r2.pts++;
@@ -61,12 +55,21 @@ export function groupTables(
 }
 
 /** All 6 matches of the group have a decided outcome. */
-export function groupComplete(
-  matches: MergedMatch[],
-  group: string,
-  pickOutcome?: (num: number) => Outcome | undefined
-): boolean {
+export function groupComplete(matches: MergedMatch[], group: string): boolean {
   return matches
     .filter((m) => m.stage === 'group' && m.group === group)
-    .every((m) => (pickOutcome ? pickOutcome(m.num) : m.outcome) !== undefined);
+    .every((m) => m.outcome !== undefined);
+}
+
+/** The 4 teams of each group, in schedule order. */
+export function groupTeams(matches: MergedMatch[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const m of matches) {
+    if (m.stage !== 'group') continue;
+    const list = (out[m.group!] ??= []);
+    for (const t of [m.team1!, m.team2!]) {
+      if (!list.includes(t)) list.push(t);
+    }
+  }
+  return out;
 }
