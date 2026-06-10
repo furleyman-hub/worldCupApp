@@ -49,7 +49,10 @@ export function ScheduleView({
   tables: Record<string, TableRow[]>;
 }) {
   const [mode, setMode] = useState<'group' | 'date'>('group');
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
   const groupMatches = merged.filter((m) => m.stage === 'group');
+  const allClosed = GROUPS.every((g) => closed[g]);
+  const toggle = (g: string) => setClosed({ ...closed, [g]: !closed[g] });
 
   return (
     <div class="view">
@@ -63,18 +66,38 @@ export function ScheduleView({
       </div>
 
       {mode === 'group' ? (
-        GROUPS.map((g) => (
-          <section class="card" key={g}>
-            <h2>Group {g}</h2>
-            {tables[g] && <GroupTable rows={tables[g]} />}
-            {groupMatches
-              .filter((m) => m.group === g)
-              .sort((a, b) => a.kickoff - b.kickoff)
-              .map((m) => (
-                <MatchRow m={m} key={m.num} />
-              ))}
-          </section>
-        ))
+        <>
+          <div class="bar">
+            <span class="note">Tap a group header to collapse it</span>
+            <button
+              class="btn"
+              onClick={() =>
+                setClosed(allClosed ? {} : Object.fromEntries(GROUPS.map((g) => [g, true])))
+              }
+            >
+              {allClosed ? 'Expand all' : 'Collapse all'}
+            </button>
+          </div>
+          {GROUPS.map((g) => (
+            <section class="card" key={g}>
+              <button class="group-head" onClick={() => toggle(g)} aria-expanded={!closed[g]}>
+                <h2>Group {g}</h2>
+                <span class="chev">{closed[g] ? '▸' : '▾'}</span>
+              </button>
+              {!closed[g] && (
+                <>
+                  {tables[g] && <GroupTable rows={tables[g]} />}
+                  {groupMatches
+                    .filter((m) => m.group === g)
+                    .sort((a, b) => a.kickoff - b.kickoff)
+                    .map((m) => (
+                      <MatchRow m={m} key={m.num} />
+                    ))}
+                </>
+              )}
+            </section>
+          ))}
+        </>
       ) : (
         <ByDate matches={groupMatches} />
       )}

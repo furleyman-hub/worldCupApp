@@ -22,12 +22,15 @@ const STAGE_NAMES: Record<string, string> = {
 export function MatchRow({
   m,
   team1,
-  team2
+  team2,
+  live
 }: {
   m: MergedMatch;
   /** resolved names for knockout matches (group matches use m.team1/2) */
   team1?: string | null;
   team2?: string | null;
+  /** match is in progress right now (Home view) */
+  live?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const t1 = m.stage === 'group' ? m.team1 : team1;
@@ -43,8 +46,12 @@ export function MatchRow({
       <div class="match-line">
         <span class="num">M{m.num}</span>
         <TeamBadge team={t1} placeholder={label1} winner={m.outcome === 'team1'} />
-        <span class={`mid${played ? ' score' : ''}`}>
-          {played ? scoreLabel(m.score) : formatET(m.dateUtc, m.etDisplay).replace(/^\w+, /, '')}
+        <span class={`mid${played ? ' score' : ''}${!played && live ? ' live' : ''}`}>
+          {played
+            ? scoreLabel(m.score)
+            : live
+              ? 'LIVE'
+              : formatET(m.dateUtc, m.etDisplay).replace(/^\w+, /, '')}
         </span>
         <TeamBadge team={t2} placeholder={label2} winner={m.outcome === 'team2'} right />
       </div>

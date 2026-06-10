@@ -260,6 +260,59 @@ a {
   line-height: 1.6;
 }
 
+/* home: live indicators */
+.live-card {
+  border-color: var(--danger);
+}
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  margin-right: 7px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.match-line .mid.live {
+  color: var(--danger);
+  font-weight: 700;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* collapsible group cards */
+.group-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.group-head h2 {
+  margin: 0;
+}
+.group-head .chev {
+  color: var(--dim);
+  font-size: 14px;
+}
+.group-head[aria-expanded='true'] {
+  margin-bottom: 8px;
+}
+
 /* standings tables */
 .standings {
   width: 100%;

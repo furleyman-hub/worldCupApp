@@ -14,6 +14,7 @@ import {
   watchAuth
 } from './lib/firebase';
 import { timeAgo } from './lib/time';
+import { Home } from './components/Home';
 import { ScheduleView } from './components/ScheduleView';
 import { BracketView } from './components/BracketView';
 import { MyBracket } from './components/MyBracket';
@@ -22,9 +23,10 @@ import { Settings } from './components/Settings';
 
 const SCHEDULE = scheduleJson as ScheduleMatch[];
 
-type Tab = 'groups' | 'bracket' | 'picks' | 'pool' | 'more';
+type Tab = 'home' | 'groups' | 'bracket' | 'picks' | 'pool' | 'more';
 
 const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'home', icon: '🏠', label: 'Home' },
   { id: 'groups', icon: '📅', label: 'Schedule' },
   { id: 'bracket', icon: '🏆', label: 'Bracket' },
   { id: 'picks', icon: '✏️', label: 'My Picks' },
@@ -34,7 +36,7 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
 
 export function App() {
   const [tab, setTab] = useState<Tab>(
-    () => (location.hash.replace('#', '') as Tab) || 'groups'
+    () => (location.hash.replace('#', '') as Tab) || 'home'
   );
   const [feed, setFeed] = useState<FeedCache | null>(() => cachedFeed());
   const [refreshing, setRefreshing] = useState(false);
@@ -132,6 +134,7 @@ export function App() {
       </header>
 
       <main class="content">
+        {tab === 'home' && <Home merged={merged} resolution={actualResolution} />}
         {tab === 'groups' && <ScheduleView merged={merged} tables={tables} />}
         {tab === 'bracket' && <BracketView merged={merged} resolution={actualResolution} />}
         {tab === 'picks' && <MyBracket merged={merged} picks={picks} onChange={changePicks} />}
