@@ -25,6 +25,25 @@ export function formatET(dateUtc: string, fallback: string): string {
   }
 }
 
+let dayFmt: Intl.DateTimeFormat | null = null;
+try {
+  dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+} catch {
+  dayFmt = null;
+}
+
+/** "Thursday, June 11" in the viewer's local timezone. */
+export function formatLocalDay(epoch: number): string {
+  if (dayFmt) {
+    try {
+      return dayFmt.format(new Date(epoch));
+    } catch {
+      /* fall through */
+    }
+  }
+  return new Date(epoch).toDateString();
+}
+
 export function timeAgo(epoch: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - epoch) / 1000));
   if (s < 60) return 'just now';
