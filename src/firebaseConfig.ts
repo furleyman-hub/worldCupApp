@@ -12,9 +12,9 @@ const firebaseConfig = {
   messagingSenderId: "1005673655822",
   appId: "1:1005673655822:web:2e1f1b1223af3b0d61565f"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 // Shared passphrase the family must type when creating an account.
 // A light gate against strangers signing up — change it to anything you like.
 export const FAMILY_PASSPHRASE = 'usawins';
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
