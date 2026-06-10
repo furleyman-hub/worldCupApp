@@ -1,17 +1,17 @@
-// Copy this file to src/firebaseConfig.ts and fill in the values from your
-// Firebase console (Project settings -> Your apps -> Web app -> Config).
-// The web config is NOT a secret — security comes from Firestore rules.
-// See SETUP.md for the full walkthrough.
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyA-mxGQU7KX-kyRz2XWu-Zk-y6fSPgnkGs",
+  authDomain: "world-cup-2026-b594c.firebaseapp.com",
+  projectId: "world-cup-2026-b594c",
+  storageBucket: "world-cup-2026-b594c.firebasestorage.app",
+  messagingSenderId: "1005673655822",
+  appId: "1:1005673655822:web:2e1f1b1223af3b0d61565f"
 };
 
-// Shared passphrase the family must type when creating an account.
-// A light gate against strangers signing up — change it to anything you like.
-export const FAMILY_PASSPHRASE = 'changeme';
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
