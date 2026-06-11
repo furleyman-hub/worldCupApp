@@ -15,9 +15,11 @@ Fire tablets (Silk or Firefox), and iPhones (Safari).
 - **Bracket** — the knockout rounds drawn as a graphical tournament bracket,
   filled in as real results arrive. Knockout matches follow FIFA rules:
   extra time, then penalty shoot-out — no draws.
-- **Results** — refreshed automatically every time the app opens (and a ↻
-  button), from the free public-domain
-  [openfootball](https://github.com/openfootball/worldcup.json) dataset.
+- **Results** — live in-progress scores with the match clock (polled every
+  minute from ESPN's public scoreboard while games are on), and final results
+  from the free public-domain
+  [openfootball](https://github.com/openfootball/worldcup.json) dataset,
+  which stays authoritative for standings, bracket and pool scoring.
 - **My Picks** — order each group's teams 1st→4th, choose the 8 third-place
   qualifiers, and your Round of 32 builds itself; tap teams through the
   bracket to your champion. Group picks lock at the opening kickoff, knockout

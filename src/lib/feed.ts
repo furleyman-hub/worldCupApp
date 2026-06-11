@@ -1,4 +1,5 @@
 import type { MergedMatch, Outcome, ScheduleMatch, Score } from './types';
+import type { LiveCache, LiveMatch } from './livefeed';
 
 export const FEED_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
@@ -99,14 +100,27 @@ export function cachedFeed(): FeedCache | null {
 }
 
 /**
- * Merge live feed results into the bundled canonical schedule.
+ * Merge feed results into the bundled canonical schedule.
  * Knockout matches merge by num. The feed omits num for group matches, but
  * every group-stage pairing is unique, so they merge by normalized team pair
  * (with a reversed-order fallback that swaps the score sides).
+ *
+ * The optional live scoreboard layers on top: openfootball results stay
+ * authoritative, live data fills the gap while a match is being played (and,
+ * for group matches ESPN marks final, synthesizes the result early so
+ * standings update before openfootball catches up).
  */
-export function mergeFeed(schedule: ScheduleMatch[], feed: FeedCache | null): MergedMatch[] {
+export function mergeFeed(
+  schedule: ScheduleMatch[],
+  feed: FeedCache | null,
+  live?: LiveCache | null
+): MergedMatch[] {
   const byNum = new Map<number, FeedMatch>();
   const byPair = new Map<string, FeedMatch>();
+  const liveByPair = new Map<string, LiveMatch>();
+  for (const lm of live?.matches ?? []) {
+    liveByPair.set(`${lm.team1}|${lm.team2}`, lm);
+  }
   if (feed) {
     for (const fm of feed.matches) {
       if (fm.group) {
@@ -137,28 +151,58 @@ export function mergeFeed(schedule: ScheduleMatch[], feed: FeedCache | null): Me
         reversed = !!fm;
       }
     }
-    if (!fm) return out;
-    if (reversed && fm.score) {
-      const flip = (p?: [number, number]): [number, number] | undefined =>
-        p ? [p[1], p[0]] : undefined;
-      fm = { ...fm, score: { ht: flip(fm.score.ht), ft: flip(fm.score.ft), et: flip(fm.score.et), p: flip(fm.score.p) } };
+    if (fm) {
+      if (reversed && fm.score) {
+        const flip = (p?: [number, number]): [number, number] | undefined =>
+          p ? [p[1], p[0]] : undefined;
+        fm = { ...fm, score: { ht: flip(fm.score.ht), ft: flip(fm.score.ft), et: flip(fm.score.et), p: flip(fm.score.p) } };
+      }
+
+      if (isKO) {
+        // Feed replaces placeholders with real team names once known.
+        const t1 = teamName(fm.team1);
+        const t2 = teamName(fm.team2);
+        if (t1 && !isPlaceholder(t1)) out.resolved1 = t1;
+        if (t2 && !isPlaceholder(t2)) out.resolved2 = t2;
+      }
+      if (fm.score) {
+        out.score = fm.score;
+        out.outcome = outcomeFromScore(fm.score, isKO);
+        if (out.outcome === 'team1') out.winnerTeam = isKO ? out.resolved1 : m.team1;
+        if (out.outcome === 'team2') out.winnerTeam = isKO ? out.resolved2 : m.team2;
+      }
     }
 
-    if (isKO) {
-      // Feed replaces placeholders with real team names once known.
-      const t1 = teamName(fm.team1);
-      const t2 = teamName(fm.team2);
-      if (t1 && !isPlaceholder(t1)) out.resolved1 = t1;
-      if (t2 && !isPlaceholder(t2)) out.resolved2 = t2;
-    }
-    if (fm.score) {
-      out.score = fm.score;
-      out.outcome = outcomeFromScore(fm.score, isKO);
-      if (out.outcome === 'team1') out.winnerTeam = isKO ? out.resolved1 : m.team1;
-      if (out.outcome === 'team2') out.winnerTeam = isKO ? out.resolved2 : m.team2;
-    }
+    attachLive(out, isKO, liveByPair);
     return out;
   });
+}
+
+/** Layer the live scoreboard onto a match openfootball hasn't decided yet. */
+function attachLive(out: MergedMatch, isKO: boolean, liveByPair: Map<string, LiveMatch>) {
+  if (out.score || out.outcome || liveByPair.size === 0) return;
+  const t1 = isKO ? out.resolved1 : out.team1;
+  const t2 = isKO ? out.resolved2 : out.team2;
+  if (!t1 || !t2) return;
+  const a = normTeam(t1);
+  const b = normTeam(t2);
+  let lm = liveByPair.get(`${a}|${b}`);
+  let reversed = false;
+  if (!lm) {
+    lm = liveByPair.get(`${b}|${a}`);
+    reversed = !!lm;
+  }
+  if (!lm) return;
+  const score: [number, number] = reversed ? [lm.score[1], lm.score[0]] : lm.score;
+  out.live = { score, clock: lm.clock, finished: lm.state === 'post' };
+  // A group match ESPN marks final has an unambiguous result (no extra time),
+  // so fill it in early; knockout outcomes (ET/penalties) wait for openfootball.
+  if (lm.state === 'post' && !isKO) {
+    out.score = { ft: score };
+    out.outcome = outcomeFromScore(out.score, false);
+    if (out.outcome === 'team1') out.winnerTeam = out.team1;
+    if (out.outcome === 'team2') out.winnerTeam = out.team2;
+  }
 }
 
 /** Display string like "2-1", "1-1 (4-2 pens)", "2-2 (aet 3-3)" */
