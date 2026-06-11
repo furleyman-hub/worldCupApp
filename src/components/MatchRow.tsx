@@ -46,12 +46,14 @@ export function MatchRow({
       <div class="match-line">
         <span class="num">M{m.num}</span>
         <TeamBadge team={t1} placeholder={label1} winner={m.outcome === 'team1'} />
-        <span class={`mid${played ? ' score' : ''}${!played && live ? ' live' : ''}`}>
+        <span class={`mid${played ? ' score' : ''}${!played && (live || m.live) ? ' live' : ''}`}>
           {played
             ? scoreLabel(m.score)
-            : live
-              ? 'LIVE'
-              : formatET(m.dateUtc, m.etDisplay).replace(/^\w+, /, '')}
+            : m.live
+              ? `${m.live.score[0]}–${m.live.score[1]} · ${m.live.clock}`
+              : live
+                ? 'LIVE'
+                : formatET(m.dateUtc, m.etDisplay).replace(/^\w+, /, '')}
         </span>
         <TeamBadge team={t2} placeholder={label2} winner={m.outcome === 'team2'} right />
       </div>

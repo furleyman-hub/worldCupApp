@@ -33,6 +33,8 @@ export interface MergedMatch extends ScheduleMatch {
   outcome?: Outcome;
   /** winner team name, when known */
   winnerTeam?: string;
+  /** in-progress (or just-finished) score from the live feed */
+  live?: { score: [number, number]; clock: string; finished: boolean };
 }
 
 export interface Picks {
