@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'preact/hooks';
-import { emptyPicks, type MergedMatch, type UserInfo } from '../lib/types';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { emptyPicks, type MergedMatch, type Picks, type UserInfo } from '../lib/types';
 import { computeScore, POINTS, type ScoreBreakdown } from '../lib/scoring';
 import { predictedChampion } from '../lib/bracket';
 import { cloudEnabled, loadAllPicks } from '../lib/firebase';
@@ -12,37 +12,46 @@ interface Row {
 }
 
 export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: string | null }) {
-  const [rows, setRows] = useState<Row[] | null>(null);
+  const [data, setData] = useState<{ users: UserInfo[]; picks: Record<string, Picks> } | null>(
+    null
+  );
   const [error, setError] = useState('');
   const [open, setOpen] = useState<string | null>(null);
 
   const load = async () => {
     setError('');
     try {
-      const { users, picks } = await loadAllPicks();
-      const scored: Row[] = users.map((u) => {
-        const p = picks[u.uid] || emptyPicks();
-        return {
-          user: u,
-          score: computeScore(p, merged),
-          champion: predictedChampion(merged, p)
-        };
-      });
-      scored.sort(
-        (a, b) =>
-          b.score.total - a.score.total ||
-          b.score.positionCorrect - a.score.positionCorrect ||
-          a.user.joinedAt - b.user.joinedAt
-      );
-      setRows(scored);
+      setData(await loadAllPicks());
     } catch (e) {
       setError(`Could not load the pool: ${(e as Error).message}`);
     }
   };
 
+  // Firestore rules only allow signed-in reads, and the auth session restores
+  // asynchronously on app start — so wait for a uid before querying.
   useEffect(() => {
-    if (cloudEnabled) load();
-  }, [merged]);
+    if (cloudEnabled && myUid) load();
+  }, [myUid]);
+
+  // scoring is recomputed locally as results arrive; no refetch needed
+  const rows = useMemo(() => {
+    if (!data) return null;
+    const scored: Row[] = data.users.map((u) => {
+      const p = data.picks[u.uid] || emptyPicks();
+      return {
+        user: u,
+        score: computeScore(p, merged),
+        champion: predictedChampion(merged, p)
+      };
+    });
+    scored.sort(
+      (a, b) =>
+        b.score.total - a.score.total ||
+        b.score.positionCorrect - a.score.positionCorrect ||
+        a.user.joinedAt - b.user.joinedAt
+    );
+    return scored;
+  }, [data, merged]);
 
   if (!cloudEnabled) {
     return (
@@ -52,6 +61,19 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
           <p>
             The shared pool isn't configured yet. Follow <b>SETUP.md</b> in the repository to
             create the free Firebase project, then everyone can sign up and compare brackets here.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  if (!myUid) {
+    return (
+      <div class="view">
+        <section class="card">
+          <h2>Family pool</h2>
+          <p class="note">
+            Sign in (or create an account) on the <b>⚙️ More</b> tab to see the leaderboard.
           </p>
         </section>
       </div>
