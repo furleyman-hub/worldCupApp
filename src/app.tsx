@@ -16,6 +16,7 @@ import {
   watchAuth
 } from './lib/firebase';
 import { timeAgo } from './lib/time';
+import { clampToLocks } from './components/MyBracket';
 import { Home } from './components/Home';
 import { ScheduleView } from './components/ScheduleView';
 import { BracketView } from './components/BracketView';
@@ -105,7 +106,13 @@ export function App() {
               setPicks(cloud);
               saveLocalPicks(cloud);
             } else {
-              savePicksCloud(u.uid, loadLocalPicks()).catch(() => {});
+              const local = loadLocalPicks();
+              savePicksCloud(u.uid, local).catch(() => {
+                // a lock may have passed since the picks were made and the
+                // server rejects the whole write — salvage what's still open
+                const clamped = clampToLocks(local, mergeFeed(SCHEDULE, null), Date.now());
+                savePicksCloud(u.uid, clamped).catch(() => {});
+              });
             }
           })
           .catch(() => {});

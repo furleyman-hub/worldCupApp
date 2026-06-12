@@ -48,6 +48,23 @@ export function prunePicks(picks: Picks, merged: MergedMatch[]): Picks {
   return { ...picks, thirds, knockout };
 }
 
+/**
+ * Drop the sections whose lock has already passed. Used to salvage a delayed
+ * cloud sync: the server rejects a write that touches any locked section, so
+ * a retry must only carry what is still open. (The locked picks survive on
+ * the device but can no longer be proven to predate the lock.)
+ */
+export function clampToLocks(picks: Picks, merged: MergedMatch[], now: number): Picks {
+  const locks = groupLockTimes(merged);
+  const groupOrder: Record<string, string[]> = {};
+  for (const [g, order] of Object.entries(picks.groupOrder)) {
+    if (now < (locks[g] ?? 0)) groupOrder[g] = order;
+  }
+  const thirds = now < thirdsLockTime(merged) ? picks.thirds : [];
+  const knockout = now < knockoutLockTime(merged) ? picks.knockout : {};
+  return prunePicks({ groupOrder, thirds, knockout }, merged);
+}
+
 export function MyBracket({
   merged,
   picks,
