@@ -13,6 +13,7 @@ import {
 } from '../src/lib/bracket';
 import { computeScore } from '../src/lib/scoring';
 import {
+  clampToLocks,
   groupLockTimes,
   knockoutLockTime,
   prunePicks,
@@ -233,6 +234,28 @@ describe('pick locking', () => {
     expect(thirdsLockTime(merged)).toBe(Math.max(...Object.values(locks)));
     // thirds lock before the knockout lock
     expect(thirdsLockTime(merged)).toBeLessThan(knockoutLockTime(merged));
+  });
+
+  it('clampToLocks salvages only the still-open sections', () => {
+    const merged = mergeFeed(SCHEDULE, null);
+    const locks = groupLockTimes(merged);
+    const picks = allPicks();
+
+    // between group A's lock and group B's: A is dropped, the rest survive
+    const betweenAB = locks['B'] - 1;
+    const clamped = clampToLocks(picks, merged, betweenAB);
+    expect(clamped.groupOrder['A']).toBeUndefined();
+    expect(clamped.groupOrder['B']).toEqual(picks.groupOrder['B']);
+    expect(Object.keys(clamped.groupOrder).length).toBe(11);
+    // A's third-place candidate falls out with its group
+    expect(clamped.thirds.includes(picks.groupOrder['A'][2])).toBe(false);
+
+    // once the thirds lock passes, all group-stage picks are gone but
+    // knockout picks (still open) survive pruning against an empty bracket
+    const afterThirds = thirdsLockTime(merged);
+    const late = clampToLocks(picks, merged, afterThirds);
+    expect(Object.keys(late.groupOrder).length).toBe(0);
+    expect(late.thirds).toEqual([]);
   });
 });
 
