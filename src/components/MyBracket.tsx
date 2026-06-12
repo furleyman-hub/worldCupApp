@@ -9,9 +9,24 @@ import { TeamBadge, teamInfo } from './TeamBadge';
 const GROUPS = 'ABCDEFGHIJKL'.split('');
 const POS_LABELS = ['1st', '2nd', '3rd', '4th'];
 
-/** Group orders and third-place picks lock at the tournament's first kickoff. */
-export function groupLockTime(merged: MergedMatch[]): number {
-  return Math.min(...merged.filter((m) => m.stage === 'group').map((m) => m.kickoff));
+/** Each group's order locks at that group's own first kickoff. */
+export function groupLockTimes(merged: MergedMatch[]): Record<string, number> {
+  const locks: Record<string, number> = {};
+  for (const m of merged) {
+    if (m.stage !== 'group') continue;
+    const g = m.group!;
+    if (!(g in locks) || m.kickoff < locks[g]) locks[g] = m.kickoff;
+  }
+  return locks;
+}
+
+/**
+ * Third-place picks lock when the last group kicks off: every order is frozen
+ * by then, and it is safely before the first group finishes — so the choice
+ * can never be made with real results in hand.
+ */
+export function thirdsLockTime(merged: MergedMatch[]): number {
+  return Math.max(...Object.values(groupLockTimes(merged)));
 }
 
 /** Knockout picks all lock at the first Round-of-32 kickoff. */
@@ -47,8 +62,9 @@ export function MyBracket({
   const resolution = useMemo(() => resolvePickedBracket(merged, picks), [merged, picks]);
   const teamsByGroup = useMemo(() => groupTeams(merged), [merged]);
 
-  const groupLock = groupLockTime(merged);
-  const groupLocked = now >= groupLock;
+  const locks = groupLockTimes(merged);
+  const thirdsLock = thirdsLockTime(merged);
+  const thirdsLocked = now >= thirdsLock;
   const koLock = knockoutLockTime(merged);
   const koLocked = now >= koLock;
 
@@ -89,8 +105,9 @@ export function MyBracket({
         <p>
           Three steps: order each group's teams 1st→4th ({orderedGroups}/12 groups done), choose
           the 8 third-place teams that advance ({picks.thirds.length}/8), then tap teams through
-          your Round of 32 bracket to the title. Group picks lock at the opening kickoff; the
-          knockout bracket locks at the first Round-of-32 game.
+          your Round of 32 bracket to the title. Each group locks at its own first kickoff, the
+          third-place picks when the last group starts, and the knockout bracket at the first
+          Round-of-32 game — so it's never too late to join in.
         </p>
         {champion && (
           <p class="champ">
@@ -99,27 +116,31 @@ export function MyBracket({
         )}
       </section>
 
-      <h2 class="section-title">
-        1. Group finishing order{' '}
-        {groupLocked
-          ? '🔒 (locked)'
-          : `— open until ${formatET(new Date(groupLock).toISOString(), '')}`}
-      </h2>
+      <h2 class="section-title">1. Group finishing order</h2>
       <p class="note">
         Tap teams in finishing order: first tap is the group winner, last is 4th. Tap a placed
-        team to redo from there. Top 2 advance; 3rd place might.
+        team to redo from there. Top 2 advance; 3rd place might. Each group stays open until its
+        own first match kicks off.
       </p>
       {GROUPS.map((g) => {
         const order = picks.groupOrder[g] || [];
+        const locked = now >= (locks[g] ?? 0);
         return (
           <section class="card" key={g}>
-            <h2>Group {g}</h2>
+            <h2>
+              Group {g}{' '}
+              <span class="lock-when">
+                {locked
+                  ? '🔒 locked'
+                  : `open until ${formatET(new Date(locks[g]).toISOString(), '')}`}
+              </span>
+            </h2>
             {(teamsByGroup[g] || []).map((team) => {
               const pos = order.indexOf(team);
               return (
                 <button
                   class={`order-row${pos >= 0 ? ` placed p${pos}` : ''}`}
-                  disabled={groupLocked}
+                  disabled={locked}
                   onClick={() => tapTeam(g, team)}
                   key={team}
                 >
@@ -135,9 +156,9 @@ export function MyBracket({
 
       <h2 class="section-title">
         2. Third-place qualifiers{' '}
-        {groupLocked
+        {thirdsLocked
           ? '🔒 (locked)'
-          : `— pick 8 of 12 (${picks.thirds.length}/8)`}
+          : `— pick 8 (${picks.thirds.length}/8), open until ${formatET(new Date(thirdsLock).toISOString(), '')}`}
       </h2>
       <section class="card">
         {thirdOptions.size === 0 ? (
@@ -154,7 +175,7 @@ export function MyBracket({
                 return (
                   <button
                     class={`pick-opt${on ? ' on' : ''}`}
-                    disabled={groupLocked || full}
+                    disabled={thirdsLocked || full}
                     onClick={() => tapThird(team)}
                     key={g}
                   >

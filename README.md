@@ -22,8 +22,9 @@ Fire tablets (Silk or Firefox), and iPhones (Safari).
   which stays authoritative for standings, bracket and pool scoring.
 - **My Picks** — order each group's teams 1st→4th, choose the 8 third-place
   qualifiers, and your Round of 32 builds itself; tap teams through the
-  bracket to your champion. Group picks lock at the opening kickoff, knockout
-  picks at the first Round-of-32 game.
+  bracket to your champion. Each group locks at its own first kickoff (so
+  late joiners can still play the open groups), third-place picks when the
+  last group starts, knockout picks at the first Round-of-32 game.
 - **Pool** — everyone's brackets scored live against the real tournament
   (192 points max), with a leaderboard.
 - Every team shows its flag and FIFA code; tap any match for full country
