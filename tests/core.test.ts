@@ -12,7 +12,12 @@ import {
   slotLabel
 } from '../src/lib/bracket';
 import { computeScore } from '../src/lib/scoring';
-import { prunePicks } from '../src/components/MyBracket';
+import {
+  groupLockTimes,
+  knockoutLockTime,
+  prunePicks,
+  thirdsLockTime
+} from '../src/components/MyBracket';
 
 const SCHEDULE = scheduleJson as ScheduleMatch[];
 
@@ -209,6 +214,25 @@ describe('bracket resolution from picks', () => {
     expect(Object.keys(pruned.knockout).length).toBeLessThan(31);
     // the old 3rd-place pick is no longer 3rd, so it falls out of the thirds
     expect(pruned.thirds.includes(a[2])).toBe(false);
+  });
+});
+
+describe('pick locking', () => {
+  it('locks each group at its own first kickoff, thirds at the last one', () => {
+    const merged = mergeFeed(SCHEDULE, null);
+    const locks = groupLockTimes(merged);
+    expect(Object.keys(locks).sort().join('')).toBe('ABCDEFGHIJKL');
+    // every lock is that group's earliest kickoff
+    for (const [g, t] of Object.entries(locks)) {
+      const earliest = Math.min(
+        ...merged.filter((m) => m.stage === 'group' && m.group === g).map((m) => m.kickoff)
+      );
+      expect(t).toBe(earliest);
+    }
+    expect(locks['A']).toBe(Date.parse('2026-06-11T19:00:00.000Z'));
+    expect(thirdsLockTime(merged)).toBe(Math.max(...Object.values(locks)));
+    // thirds lock before the knockout lock
+    expect(thirdsLockTime(merged)).toBeLessThan(knockoutLockTime(merged));
   });
 });
 
