@@ -9,6 +9,7 @@ interface Row {
   user: UserInfo;
   score: ScoreBreakdown;
   champion: string | null;
+  picks: Picks;
 }
 
 export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: string | null }) {
@@ -41,7 +42,8 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
       return {
         user: u,
         score: computeScore(p, merged),
-        champion: predictedChampion(merged, p)
+        champion: predictedChampion(merged, p),
+        picks: p
       };
     });
     scored.sort(
@@ -114,7 +116,7 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
             </span>
             <span class="lb-pts">{r.score.total} pts</span>
           </div>
-          {open === r.user.uid && <Breakdown s={r.score} />}
+          {open === r.user.uid && <Breakdown s={r.score} picks={r.picks} />}
         </section>
       ))}
       <ScoringRules />
@@ -122,7 +124,10 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
   );
 }
 
-function Breakdown({ s }: { s: ScoreBreakdown }) {
+function Breakdown({ s, picks }: { s: ScoreBreakdown; picks: Picks }) {
+  // how much of their ballot has actually reached the pool
+  const groups = Object.values(picks.groupOrder).filter((o) => o?.length === 4).length;
+  const ko = Object.keys(picks.knockout).length;
   const round = (label: string, teams: string[], pts: number) => (
     <div class="bd-row">
       <span>
@@ -135,6 +140,12 @@ function Breakdown({ s }: { s: ScoreBreakdown }) {
   );
   return (
     <div class="breakdown">
+      <div class="bd-row">
+        <span>Picks in the pool</span>
+        <span>
+          {groups}/12 groups · {picks.thirds.length}/8 thirds · {ko}/31 bracket
+        </span>
+      </div>
       <div class="bd-row">
         <span>Group positions</span>
         <span>

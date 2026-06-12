@@ -69,11 +69,14 @@ export function MyBracket({
   merged,
   picks,
   onChange,
+  saveError,
   now = Date.now()
 }: {
   merged: MergedMatch[];
   picks: Picks;
   onChange: (p: Picks) => void;
+  /** last cloud-save failure, surfaced loudly so it can't be missed */
+  saveError?: string;
   now?: number;
 }) {
   const resolution = useMemo(() => resolvePickedBracket(merged, picks), [merged, picks]);
@@ -129,6 +132,12 @@ export function MyBracket({
         {champion && (
           <p class="champ">
             🏆 Your champion: <TeamBadge team={champion} /> {teamInfo(champion)?.name}
+          </p>
+        )}
+        {saveError && (
+          <p class="error">
+            ⚠️ Your picks are NOT reaching the family pool — {saveError}. They are safe on this
+            device; fix the issue and tap any pick to retry.
           </p>
         )}
       </section>

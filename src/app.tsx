@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { User } from 'firebase/auth';
 import scheduleJson from './data/schedule.json';
 import type { Picks, ScheduleMatch } from './lib/types';
+import { isEmptyPicks } from './lib/types';
 import { cachedFeed, fetchFeed, mergeFeed, type FeedCache } from './lib/feed';
 import { fetchLive, type LiveCache } from './lib/livefeed';
 import { matchStatus } from './lib/today';
@@ -99,14 +100,16 @@ export function App() {
       watchAuth((u) => {
         setUser(u);
         if (!u) return;
-        // cloud picks win on sign-in; if none exist yet, push the local ones up
+        // cloud picks win on sign-in — but an EMPTY cloud doc (created at
+        // registration before any pick reached the server) must not clobber
+        // picks made on this device; push those up instead
         loadMyPicks(u.uid)
           .then((cloud) => {
-            if (cloud) {
+            const local = loadLocalPicks();
+            if (cloud && (!isEmptyPicks(cloud) || isEmptyPicks(local))) {
               setPicks(cloud);
               saveLocalPicks(cloud);
             } else {
-              const local = loadLocalPicks();
               savePicksCloud(u.uid, local).catch(() => {
                 // a lock may have passed since the picks were made and the
                 // server rejects the whole write — salvage what's still open
@@ -169,7 +172,14 @@ export function App() {
         {tab === 'home' && <Home merged={merged} resolution={actualResolution} />}
         {tab === 'groups' && <ScheduleView merged={merged} tables={tables} />}
         {tab === 'bracket' && <BracketView merged={merged} resolution={actualResolution} />}
-        {tab === 'picks' && <MyBracket merged={merged} picks={picks} onChange={changePicks} />}
+        {tab === 'picks' && (
+          <MyBracket
+            merged={merged}
+            picks={picks}
+            onChange={changePicks}
+            saveError={saveState.startsWith('save failed') ? saveState.replace(/^save failed: /, '') : ''}
+          />
+        )}
         {tab === 'pool' && <Leaderboard merged={merged} myUid={user?.uid ?? null} />}
         {tab === 'more' && (
           <Settings

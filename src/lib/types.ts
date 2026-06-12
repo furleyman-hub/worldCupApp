@@ -51,6 +51,14 @@ export function emptyPicks(): Picks {
   return { groupOrder: {}, thirds: [], knockout: {} };
 }
 
+export function isEmptyPicks(p: Picks): boolean {
+  return (
+    Object.keys(p.groupOrder).length === 0 &&
+    p.thirds.length === 0 &&
+    Object.keys(p.knockout).length === 0
+  );
+}
+
 export interface UserInfo {
   uid: string;
   displayName: string;
