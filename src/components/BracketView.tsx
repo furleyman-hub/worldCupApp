@@ -40,18 +40,25 @@ export function Bracket({
               {col.map((m) => {
                 const [t1, t2] = resolution.participants[m.num] || [null, null];
                 const win = predict ? pickedWinner!(m.num) : m.winnerTeam;
-                const cell = (team: string | null, slot: string, isWin: boolean) => (
-                  <button
-                    class={`bk-team${isWin ? ' winner' : ''}${predict && team && !locked ? ' pickable' : ''}`}
-                    disabled={!predict || !team || locked}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (predict && team && !locked) onPick!(m.num, team);
-                    }}
-                  >
-                    <TeamBadge team={team} placeholder={slotLabel(slot)} winner={isWin} />
-                  </button>
-                );
+                const cell = (team: string | null, slot: string, isWin: boolean) => {
+                  // a filled third-place slot before the standings are final
+                  const provisional =
+                    !predict && resolution.thirdsProvisional && slot.startsWith('3') && !!team;
+                  return (
+                    <button
+                      class={`bk-team${isWin ? ' winner' : ''}${provisional ? ' provisional' : ''}${predict && team && !locked ? ' pickable' : ''}`}
+                      disabled={!predict || !team || locked}
+                      title={provisional ? 'Provisional — third-place spots finalize once all groups end' : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (predict && team && !locked) onPick!(m.num, team);
+                      }}
+                    >
+                      <TeamBadge team={team} placeholder={slotLabel(slot)} winner={isWin} />
+                      {provisional && <span class="prov-tag">likely</span>}
+                    </button>
+                  );
+                };
                 return (
                   <div class="bk-match" key={m.num}>
                     <div class="bk-head">
@@ -89,6 +96,12 @@ export function BracketView({
   return (
     <div class="view">
       <Bracket merged={merged} resolution={resolution} />
+      {resolution.thirdsProvisional && (
+        <p class="note">
+          ⓘ Teams marked <span class="prov-tag">likely</span> are the current best third-place
+          qualifiers — these spots refine as more groups finish and lock in once all 12 are done.
+        </p>
+      )}
       <section class="card">
         <h2>Third place match</h2>
         <MatchRow m={third} team1={t1} team2={t2} />

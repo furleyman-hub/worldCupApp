@@ -19,6 +19,9 @@ export interface BracketResolution {
   participants: Record<number, [string | null, string | null]>;
   /** the 8 third-place qualifiers (for UI) */
   thirdQualifiers: string[];
+  /** true when the third-place slots are a provisional best-guess (fewer than
+   *  all 12 groups finished) rather than mathematically final */
+  thirdsProvisional: boolean;
 }
 
 interface ThirdQualifier {
@@ -26,8 +29,20 @@ interface ThirdQualifier {
   group: string;
 }
 
-/** Actual bracket from completed groups + live feed results. */
-export function resolveBracket(matches: MergedMatch[]): BracketResolution {
+/**
+ * Actual bracket from completed groups + live feed results.
+ *
+ * The best-8 third-place qualifiers can only be RANKED once all 12 groups
+ * finish. With `provisionalThirds`, the bracket fills the third-place slots
+ * as soon as 8 groups are done (using a provisional best-8 of the finished
+ * groups, refining as more finish) so the display updates through the last
+ * days of the group stage. Scoring leaves this off, so points never count a
+ * third-place qualifier until the standings are mathematically final.
+ */
+export function resolveBracket(
+  matches: MergedMatch[],
+  opts: { provisionalThirds?: boolean } = {}
+): BracketResolution {
   const tables = groupTables(matches);
 
   // Rank of finished groups only — an in-progress table must not feed the bracket.
@@ -41,10 +56,11 @@ export function resolveBracket(matches: MergedMatch[]): BracketResolution {
     thirds.push({ team: t[2].team, group: g, row: t[2] });
   }
 
-  // Best 8 third-place teams qualify (ranked like a table; only meaningful
-  // once all 12 groups are decided).
+  // Best 8 third-place teams qualify (ranked like a table). Final at 12 groups;
+  // provisional once 8+ are in when the caller opts in.
   let thirdQualifiers: ThirdQualifier[] = [];
-  if (thirds.length === 12) {
+  let thirdsProvisional = false;
+  if (thirds.length === 12 || (opts.provisionalThirds && thirds.length >= 8)) {
     thirds.sort(
       (a, b) =>
         b.row.pts - a.row.pts ||
@@ -53,10 +69,11 @@ export function resolveBracket(matches: MergedMatch[]): BracketResolution {
         a.team.localeCompare(b.team)
     );
     thirdQualifiers = thirds.slice(0, 8);
+    thirdsProvisional = thirds.length < 12;
   }
 
   const byNum = new Map(matches.map((m) => [m.num, m]));
-  return buildBracket(matches, placed, thirdQualifiers, {
+  return buildBracket(matches, placed, thirdQualifiers, thirdsProvisional, {
     useFeed: true,
     winnerOf: (num, participants) => {
       void participants;
@@ -80,7 +97,7 @@ export function resolvePickedBracket(matches: MergedMatch[], picks: Picks): Brac
     .map((team) => ({ team, group: valid.get(team)! }))
     .filter((t) => t.group);
 
-  return buildBracket(matches, placed, thirdQualifiers.length === 8 ? thirdQualifiers : [], {
+  return buildBracket(matches, placed, thirdQualifiers.length === 8 ? thirdQualifiers : [], false, {
     useFeed: false,
     winnerOf: (num, participants) => {
       // A pick only counts while it is still one of the match's resolved
@@ -114,6 +131,7 @@ function buildBracket(
   matches: MergedMatch[],
   placed: Map<string, string>,
   thirdQualifiers: ThirdQualifier[],
+  thirdsProvisional: boolean,
   opts: {
     useFeed: boolean;
     winnerOf: (
@@ -181,7 +199,7 @@ function buildBracket(
     ];
   }
 
-  return { participants, thirdQualifiers: thirdQualifiers.map((t) => t.team) };
+  return { participants, thirdQualifiers: thirdQualifiers.map((t) => t.team), thirdsProvisional };
 }
 
 function parseThirdSlot(slot: string): Set<string> {

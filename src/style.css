@@ -411,6 +411,18 @@ a {
 .bk-team.winner {
   border-color: var(--accent);
 }
+.bk-team.provisional {
+  border-color: var(--amber);
+  border-style: dashed;
+}
+.prov-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--amber);
+  margin-left: 6px;
+  vertical-align: middle;
+}
 .bk-team.pickable {
   border-color: var(--line);
 }

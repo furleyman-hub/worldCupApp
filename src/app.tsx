@@ -134,7 +134,7 @@ export function App() {
 
   const merged = useMemo(() => mergeFeed(SCHEDULE, feed, live), [feed, live]);
   const tables = useMemo(() => groupTables(merged), [merged]);
-  const actualResolution = useMemo(() => resolveBracket(merged), [merged]);
+  const actualResolution = useMemo(() => resolveBracket(merged, { provisionalThirds: true }), [merged]);
 
   const changePicks = (p: Picks) => {
     setPicks(p);
