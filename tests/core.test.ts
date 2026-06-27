@@ -218,6 +218,48 @@ describe('bracket resolution from picks', () => {
   });
 });
 
+describe('actual bracket — provisional third place', () => {
+  // mark every match of the given groups as finished (team1 wins each)
+  function finishGroups(groups: string[]) {
+    return mergeFeed(SCHEDULE, null).map((m) =>
+      m.stage === 'group' && groups.includes(m.group!)
+        ? { ...m, score: { ft: [1, 0] as [number, number] }, outcome: 'team1' as const }
+        : m
+    );
+  }
+  const thirdSlot = SCHEDULE.find((m) => m.stage === 'r32' && m.slot2!.startsWith('3'))!;
+
+  it('fills third-place slots provisionally once 8 groups finish', () => {
+    const merged = finishGroups(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+    const prov = resolveBracket(merged, { provisionalThirds: true });
+    expect(prov.thirdsProvisional).toBe(true);
+    expect(prov.thirdQualifiers.length).toBe(8);
+    expect(prov.participants[thirdSlot.num][1]).toBeTruthy();
+  });
+
+  it('keeps third-place slots empty by default (scoring path) until all 12 finish', () => {
+    const merged = finishGroups(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+    const fin = resolveBracket(merged); // no provisional opt — used by scoring
+    expect(fin.thirdsProvisional).toBe(false);
+    expect(fin.thirdQualifiers.length).toBe(0);
+    expect(fin.participants[thirdSlot.num][1]).toBeNull();
+  });
+
+  it('does not mark thirds provisional once all 12 groups are in', () => {
+    const merged = finishGroups('ABCDEFGHIJKL'.split(''));
+    const res = resolveBracket(merged, { provisionalThirds: true });
+    expect(res.thirdsProvisional).toBe(false);
+    expect(res.thirdQualifiers.length).toBe(8);
+  });
+
+  it('waits for 8 groups — 7 finished is not enough', () => {
+    const merged = finishGroups(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    const res = resolveBracket(merged, { provisionalThirds: true });
+    expect(res.thirdsProvisional).toBe(false);
+    expect(res.participants[thirdSlot.num][1]).toBeNull();
+  });
+});
+
 describe('pick locking', () => {
   it('locks each group at its own first kickoff, thirds at the last one', () => {
     const merged = mergeFeed(SCHEDULE, null);
