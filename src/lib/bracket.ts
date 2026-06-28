@@ -127,6 +127,42 @@ export function predictedChampion(matches: MergedMatch[], picks: Picks): string 
   return p && (p[0] === c || p[1] === c) ? c : null;
 }
 
+// Knockout rounds by match-number range; the winner of a match in each range
+// is a team the user picked to ADVANCE out of that round.
+const KO_ROUNDS: [number, number][] = [
+  [73, 88], // R32 winners -> reach R16
+  [89, 96], // R16 -> QF
+  [97, 100], // QF -> SF
+  [101, 102], // SF -> Final
+  [104, 104] // Final -> champion
+];
+
+/**
+ * For each knockout match, the set of teams the user picked to advance out of
+ * that match's round — keyed by round, NOT by slot. Because a team lands in
+ * different slots in the predicted vs actual bracket, the comparison must be
+ * by team-and-round (the same slot-independent basis the pool scores on): your
+ * champion is flagged in whatever actual match they really turn up in.
+ */
+export function pickedRoundAdvancers(
+  matches: MergedMatch[],
+  picks: Picks
+): (num: number) => Set<string> {
+  const pred = resolvePickedBracket(matches, picks);
+  const empty = new Set<string>();
+  const sets = KO_ROUNDS.map(([lo, hi]) => {
+    const s = new Set<string>();
+    for (let n = lo; n <= hi; n++) {
+      const w = picks.knockout[String(n)];
+      const p = pred.participants[n];
+      // count a pick only while it's still one of that match's predicted teams
+      if (w && p && (p[0] === w || p[1] === w)) s.add(w);
+    }
+    return { lo, hi, s };
+  });
+  return (num) => sets.find((r) => num >= r.lo && num <= r.hi)?.s ?? empty;
+}
+
 function buildBracket(
   matches: MergedMatch[],
   placed: Map<string, string>,

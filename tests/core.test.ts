@@ -6,6 +6,7 @@ import { isPlaceholder, mergeFeed, normTeam, outcomeFromScore, scoreLabel } from
 import { groupTeams } from '../src/lib/standings';
 import {
   bracketColumns,
+  pickedRoundAdvancers,
   predictedChampion,
   resolveBracket,
   resolvePickedBracket,
@@ -215,6 +216,37 @@ describe('bracket resolution from picks', () => {
     expect(Object.keys(pruned.knockout).length).toBeLessThan(31);
     // the old 3rd-place pick is no longer 3rd, so it falls out of the thirds
     expect(pruned.thirds.includes(a[2])).toBe(false);
+  });
+
+  it('flags a picked team to advance in every round, independent of slot', () => {
+    const merged = mergeFeed(SCHEDULE, null);
+    const picks = allPicks();
+    // fill the whole knockout: winner of each match = its first participant
+    for (const m of merged) {
+      if (m.stage === 'group') continue;
+      const res = resolvePickedBracket(merged, picks);
+      const [first] = res.participants[m.num];
+      if (first && m.num !== 103) picks.knockout[String(m.num)] = first;
+    }
+    const champion = picks.knockout['104'];
+    const advancers = pickedRoundAdvancers(merged, picks);
+
+    // the champion was picked to advance out of every round, so they appear in
+    // EVERY match-number of each round's range (slot-independent membership)
+    expect(advancers(73).has(champion)).toBe(true); // any R32 match
+    expect(advancers(88).has(champion)).toBe(true); // a different R32 slot
+    expect(advancers(96).has(champion)).toBe(true); // R16
+    expect(advancers(100).has(champion)).toBe(true); // QF
+    expect(advancers(102).has(champion)).toBe(true); // SF
+    expect(advancers(104).has(champion)).toBe(true); // final/champion
+
+    // a team picked to lose its R32 match never advances anywhere
+    const r32 = merged.find((m) => m.num === 73)!;
+    const loser = resolvePickedBracket(merged, picks).participants[73].find(
+      (t) => t && t !== picks.knockout['73']
+    )!;
+    void r32;
+    expect(advancers(73).has(loser)).toBe(false);
   });
 });
 
