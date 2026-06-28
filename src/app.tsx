@@ -171,7 +171,9 @@ export function App() {
       <main class="content">
         {tab === 'home' && <Home merged={merged} resolution={actualResolution} />}
         {tab === 'groups' && <ScheduleView merged={merged} tables={tables} />}
-        {tab === 'bracket' && <BracketView merged={merged} resolution={actualResolution} />}
+        {tab === 'bracket' && (
+          <BracketView merged={merged} resolution={actualResolution} picks={picks} />
+        )}
         {tab === 'picks' && (
           <MyBracket
             merged={merged}
