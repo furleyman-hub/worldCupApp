@@ -1,6 +1,7 @@
+import { useState } from 'preact/hooks';
 import type { BracketResolution } from '../lib/bracket';
 import { bracketColumns, slotLabel } from '../lib/bracket';
-import type { MergedMatch } from '../lib/types';
+import type { MergedMatch, Picks } from '../lib/types';
 import { scoreLabel } from '../lib/feed';
 import { formatET } from '../lib/time';
 import { MatchRow } from './MatchRow';
@@ -17,6 +18,7 @@ export function Bracket({
   merged,
   resolution,
   pickedWinner,
+  myPick,
   onPick,
   locked
 }: {
@@ -24,6 +26,8 @@ export function Bracket({
   resolution: BracketResolution;
   /** current predicted winner per match (prediction mode only) */
   pickedWinner?: (num: number) => string | undefined;
+  /** the team the user picked to win this match, to overlay on the actual bracket */
+  myPick?: (num: number) => string | undefined;
   onPick?: (num: number, team: string) => void;
   locked?: boolean;
 }) {
@@ -40,10 +44,20 @@ export function Bracket({
               {col.map((m) => {
                 const [t1, t2] = resolution.participants[m.num] || [null, null];
                 const win = predict ? pickedWinner!(m.num) : m.winnerTeam;
+                const decided = !predict && !!m.winnerTeam;
                 const cell = (team: string | null, slot: string, isWin: boolean) => {
                   // a filled third-place slot before the standings are final
                   const provisional =
                     !predict && resolution.thirdsProvisional && slot.startsWith('3') && !!team;
+                  // this team is the one the user picked to win this match
+                  const mine = !!team && myPick?.(m.num) === team;
+                  const mineClass = mine
+                    ? decided
+                      ? m.winnerTeam === team
+                        ? 'hit'
+                        : 'miss'
+                      : 'pend'
+                    : '';
                   return (
                     <button
                       class={`bk-team${isWin ? ' winner' : ''}${provisional ? ' provisional' : ''}${predict && team && !locked ? ' pickable' : ''}`}
@@ -56,6 +70,20 @@ export function Bracket({
                     >
                       <TeamBadge team={team} placeholder={slotLabel(slot)} winner={isWin} />
                       {provisional && <span class="prov-tag">likely</span>}
+                      {mine && (
+                        <span
+                          class={`my-pick ${mineClass}`}
+                          title={
+                            mineClass === 'hit'
+                              ? 'Your pick — advanced'
+                              : mineClass === 'miss'
+                                ? 'Your pick — knocked out'
+                                : 'Your pick'
+                          }
+                        >
+                          {mineClass === 'hit' ? '✓' : mineClass === 'miss' ? '✗' : '●'}
+                        </span>
+                      )}
                     </button>
                   );
                 };
@@ -86,16 +114,44 @@ export function Bracket({
 
 export function BracketView({
   merged,
-  resolution
+  resolution,
+  picks
 }: {
   merged: MergedMatch[];
   resolution: BracketResolution;
+  picks: Picks;
 }) {
   const third = merged.find((m) => m.num === 103)!;
   const [t1, t2] = resolution.participants[103] || [null, null];
+  const hasPicks = Object.keys(picks.knockout).length > 0;
+  const [compare, setCompare] = useState(true);
+  const showMine = hasPicks && compare;
+
   return (
     <div class="view">
-      <Bracket merged={merged} resolution={resolution} />
+      {hasPicks && (
+        <>
+          <div class="bar">
+            <h2>Knockout bracket</h2>
+            <button class={`btn${compare ? ' primary' : ''}`} onClick={() => setCompare(!compare)}>
+              {compare ? '✓ My picks' : 'Compare my picks'}
+            </button>
+          </div>
+          {showMine && (
+            <p class="note">
+              On each match: <span class="my-pick pend">●</span> your pick (yet to play) ·{' '}
+              <span class="my-pick hit">✓</span> your pick advanced ·{' '}
+              <span class="my-pick miss">✗</span> your pick knocked out. No mark means your
+              predicted team didn't reach that match.
+            </p>
+          )}
+        </>
+      )}
+      <Bracket
+        merged={merged}
+        resolution={resolution}
+        myPick={showMine ? (num) => picks.knockout[String(num)] : undefined}
+      />
       {resolution.thirdsProvisional && (
         <p class="note">
           ⓘ Teams marked <span class="prov-tag">likely</span> are the current best third-place

@@ -423,6 +423,21 @@ a {
   margin-left: 6px;
   vertical-align: middle;
 }
+.my-pick {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.my-pick.hit {
+  color: var(--accent);
+}
+.my-pick.miss {
+  color: var(--danger);
+}
+.my-pick.pend {
+  color: #6ea8e6;
+}
 .bk-team.pickable {
   border-color: var(--line);
 }
