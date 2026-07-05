@@ -229,6 +229,9 @@ export function BracketView({
           )}
         </>
       )}
+      <h2 class="section-title">Quarter-finals to the Final</h2>
+      <FinalStretch merged={merged} resolution={resolution} myPick={showMine ? advancers : undefined} />
+
       <h2 class="section-title">Round of 32 &amp; Round of 16</h2>
       <Bracket
         merged={merged}
@@ -236,9 +239,6 @@ export function BracketView({
         myPick={showMine ? advancers : undefined}
         stages={['r32', 'r16']}
       />
-
-      <h2 class="section-title">Quarter-finals to the Final</h2>
-      <FinalStretch merged={merged} resolution={resolution} myPick={showMine ? advancers : undefined} />
 
       {resolution.thirdsProvisional && (
         <p class="note">
