@@ -445,6 +445,31 @@ a {
   opacity: 0.9;
 }
 
+/* converging final-stretch bracket: QF -> SF -> Final <- SF <- QF */
+.final-stretch {
+  display: flex;
+  gap: 14px;
+  min-width: 980px;
+  align-items: stretch;
+}
+.final-stretch .bracket-col {
+  width: 190px;
+}
+.final-stretch .fs-final {
+  width: 210px;
+}
+.final-stretch .fs-final .bk-match {
+  border-color: var(--accent);
+}
+.champion-crown {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
 /* picks editor: group finishing order */
 .order-row {
   display: flex;
