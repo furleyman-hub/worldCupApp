@@ -594,6 +594,22 @@ a {
   flex: 1;
   font-weight: 600;
 }
+.champ-banner {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(224, 176, 78, 0.12), transparent);
+}
+.champ-banner .champ-title {
+  font-size: 15px;
+}
+.champ-banner .note {
+  margin: 6px 0 0;
+}
+.lb-row.pool-winner {
+  border-color: var(--amber);
+}
+.lb-row.pool-winner .lb-pts {
+  color: var(--amber);
+}
 .lb-champ {
   display: inline-flex;
   align-items: center;
