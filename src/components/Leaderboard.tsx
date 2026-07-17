@@ -82,6 +82,19 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
     );
   }
 
+  // Once the Final is decided, crown the pool champion — and if first place
+  // was settled by a tiebreaker rather than points, say so with the numbers.
+  const tournamentOver = !!merged.find((m) => m.num === 104)?.winnerTeam;
+  const winner = tournamentOver && rows && rows.length > 0 ? rows[0] : null;
+  const runnerUp = rows && rows.length > 1 ? rows[1] : null;
+  const winnerNote = (() => {
+    if (!winner || !runnerUp || winner.score.total !== runnerUp.score.total) return '';
+    if (winner.score.positionCorrect !== runnerUp.score.positionCorrect) {
+      return `Tied on points with ${runnerUp.user.displayName} — wins the tiebreaker on correct group positions, ${winner.score.positionCorrect} vs ${runnerUp.score.positionCorrect}.`;
+    }
+    return `Tied on points and group positions with ${runnerUp.user.displayName} — earliest sign-up breaks the tie.`;
+  })();
+
   return (
     <div class="view">
       <div class="bar">
@@ -93,14 +106,31 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
       {error && <p class="error">{error}</p>}
       {!rows && !error && <p class="note">Loading…</p>}
       {rows && rows.length === 0 && <p class="note">No players yet — be the first to sign up!</p>}
-      {rows?.map((r, i) => (
+      {winner && (
+        <section class="card champ-banner">
+          <div class="champ-title">
+            🏆 Pool champion: <b>{winner.user.displayName}</b> · {winner.score.total} pts
+          </div>
+          {winnerNote && <p class="note">{winnerNote}</p>}
+        </section>
+      )}
+      {rows?.map((r, i, arr) => {
+        // While play continues, rows tied on points share a rank shown as "1=".
+        // Once the Final is decided the order IS the result (tiebreak applied),
+        // so ranks go back to plain numbers and the champion gets the trophy.
+        const sharedRank = arr.findIndex((x) => x.score.total === r.score.total) + 1;
+        const tied =
+          !tournamentOver && arr.some((x, j) => j !== i && x.score.total === r.score.total);
+        return (
         <section
-          class={`card lb-row${r.user.uid === myUid ? ' me' : ''}`}
+          class={`card lb-row${r.user.uid === myUid ? ' me' : ''}${winner && i === 0 ? ' pool-winner' : ''}`}
           key={r.user.uid}
           onClick={() => setOpen(open === r.user.uid ? null : r.user.uid)}
         >
           <div class="lb-line">
-            <span class="lb-rank">{i + 1}</span>
+            <span class="lb-rank">
+              {winner && i === 0 ? '🏆' : tournamentOver ? i + 1 : `${sharedRank}${tied ? '=' : ''}`}
+            </span>
             <span class="lb-name">
               {r.user.displayName}
               {r.user.uid === myUid ? ' (you)' : ''}
@@ -118,7 +148,8 @@ export function Leaderboard({ merged, myUid }: { merged: MergedMatch[]; myUid: s
           </div>
           {open === r.user.uid && <Breakdown s={r.score} picks={r.picks} />}
         </section>
-      ))}
+        );
+      })}
       <ScoringRules />
     </div>
   );
