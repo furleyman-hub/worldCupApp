@@ -16,6 +16,9 @@ export interface LiveMatch {
   state: 'in' | 'post';
   /** match clock or phase, e.g. "63'", "HT", "FT" */
   clock: string;
+  /** which side ESPN flags as the winner — present even on a tied score
+   *  (the tell-tale sign of a penalty shoot-out) */
+  winner?: 'team1' | 'team2';
 }
 
 export interface LiveCache {
@@ -23,8 +26,20 @@ export interface LiveCache {
   matches: LiveMatch[];
 }
 
+/**
+ * ESPN's scoreboard defaults to "today" when no `dates` param is given, so a
+ * match checked the morning after it finished would silently vanish from the
+ * feed. Request a 2-day UTC window (yesterday + today) so a just-finished
+ * match stays visible while openfootball's hand-maintained feed catches up.
+ */
+export function dateRangeParam(now = Date.now()): string {
+  const fmt = (d: Date) =>
+    `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+  return `${fmt(new Date(now - 86_400_000))}-${fmt(new Date(now))}`;
+}
+
 export async function fetchLive(): Promise<LiveCache> {
-  const res = await fetch(LIVE_URL, { cache: 'no-cache' });
+  const res = await fetch(`${LIVE_URL}?dates=${dateRangeParam()}`, { cache: 'no-cache' });
   if (!res.ok) throw new Error(`live HTTP ${res.status}`);
   return { fetchedAt: Date.now(), matches: parseLive(await res.json()) };
 }
@@ -62,13 +77,16 @@ export function parseLive(data: unknown): LiveMatch[] {
           : /half|HT/i.test(detail)
             ? 'HT'
             : String(status?.displayClock || detail || 'LIVE').replace(/:\d+$/, "'");
+      const winner: 'team1' | 'team2' | undefined =
+        home?.winner === true ? 'team1' : away?.winner === true ? 'team2' : undefined;
 
       out.push({
         team1: normTeam(t1),
         team2: normTeam(t2),
         score: [s1, s2],
         state,
-        clock
+        clock,
+        winner
       });
     } catch {
       /* skip malformed event */

@@ -73,7 +73,15 @@ function MatchCard({ m, resolution, predict, pickedWinner, myPick, onPick, locke
     <div class="bk-match">
       <div class="bk-head">
         <span>M{m.num}</span>
-        <span>{predict ? '' : m.score ? scoreLabel(m.score) : formatET(m.dateUtc, m.etDisplay)}</span>
+        <span>
+          {predict
+            ? ''
+            : m.score
+              ? scoreLabel(m.score)
+              : m.live
+                ? `${m.live.score[0]}–${m.live.score[1]} · ${m.live.clock}`
+                : formatET(m.dateUtc, m.etDisplay)}
+        </span>
       </div>
       {cell(t1, m.slot1!, !!win && win === t1)}
       {cell(t2, m.slot2!, !!win && win === t2)}
