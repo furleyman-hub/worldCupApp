@@ -194,15 +194,35 @@ function attachLive(out: MergedMatch, isKO: boolean, liveByPair: Map<string, Liv
   }
   if (!lm) return;
   const score: [number, number] = reversed ? [lm.score[1], lm.score[0]] : lm.score;
+  const winner: 'team1' | 'team2' | undefined = !lm.winner
+    ? undefined
+    : reversed
+      ? lm.winner === 'team1'
+        ? 'team2'
+        : 'team1'
+      : lm.winner;
   out.live = { score, clock: lm.clock, finished: lm.state === 'post' };
-  // A group match ESPN marks final has an unambiguous result (no extra time),
-  // so fill it in early; knockout outcomes (ET/penalties) wait for openfootball.
-  if (lm.state === 'post' && !isKO) {
+  if (lm.state !== 'post') return;
+
+  if (!isKO) {
+    // A finished group match has an unambiguous result (no extra time).
     out.score = { ft: score };
     out.outcome = outcomeFromScore(out.score, false);
     if (out.outcome === 'team1') out.winnerTeam = out.team1;
     if (out.outcome === 'team2') out.winnerTeam = out.team2;
+    return;
   }
+
+  // Knockout: the precise ft/et/pens breakdown waits for openfootball, but we
+  // can safely learn WHO WON as soon as it's unambiguous — from ESPN's own
+  // winner flag, or (only when the score isn't level) straight from the
+  // score. A level score after a completed knockout match can only mean
+  // penalties decided it, so that case requires the explicit winner flag.
+  // Just the winner is enough to update the bracket and pool scoring.
+  const decisive: 'team1' | 'team2' | undefined =
+    winner ?? (score[0] !== score[1] ? (score[0] > score[1] ? 'team1' : 'team2') : undefined);
+  if (decisive === 'team1') out.winnerTeam = out.resolved1;
+  if (decisive === 'team2') out.winnerTeam = out.resolved2;
 }
 
 /** Display string like "2-1", "1-1 (4-2 pens)", "2-2 (aet 3-3)" */
